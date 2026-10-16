@@ -1,8 +1,8 @@
 test "the desktop shell connects to the file service"
   size 1280x820
   clock data
-  expect tree has "path"
-  expect tree has "open"
+  expect tree missing "path"
+  expect tree missing "open"
   expect tree has "drawing-editor"
   tap "toggle-sidebar"
   expect state sidebarOpen == false
@@ -10,4 +10,4 @@ test "the desktop shell connects to the file service"
   expect tree has "drawing-editor"
   tap "toggle-sidebar"
   expect state sidebarOpen == true
-  expect tree has "path"
+  expect tree missing "path"

@@ -9,17 +9,43 @@ export async function startService(options: { port?: number; stateDirectory?: st
   await mkdir(stateDirectory, { recursive: true });
   const documents = new Documents(join(stateDirectory, 'recovery'));
   const historyPath = join(stateDirectory, 'recent.json');
+  const workspacePath = join(stateDirectory, 'workspace.json');
   let recent: { path: string; name: string; kind: string }[] = [];
   try { recent = JSON.parse(await readFile(historyPath, 'utf8')); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') console.error('Could not restore recent locations:', error); }
   const token = crypto.randomUUID();
-  let revision = 1, root = '', scanning = false, scanError = '', documentError = '', active: Snapshot | null = null;
-  let files: string[] = [], worker: Worker | undefined, fileWatcher: FSWatcher | undefined;
+  let revision = 1, scanning = false, scanError = '', documentError = '', active: Snapshot | null = null;
+  let folders: string[] = [];
+  let migrateWorkspace = false;
+  const files = new Map<string, string[]>();
+  let worker: Worker | undefined, fileWatcher: FSWatcher | undefined;
   let scanGeneration = 0;
   const expanded = new Set<string>(), opened = new Set<string>();
+  try {
+    const saved = JSON.parse(await readFile(workspacePath, 'utf8'));
+    if (!Array.isArray(saved.folders) || !saved.folders.every((path: unknown) => typeof path === 'string' && path.startsWith('/'))) throw new Error('Invalid saved folders.');
+    folders = [...new Set<string>(saved.folders)];
+    for (const path of Array.isArray(saved.expanded) ? saved.expanded : []) if (typeof path === 'string') expanded.add(path);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      migrateWorkspace = true;
+      folders = [...new Set(recent.filter(item => item.kind === 'folder').map(item => item.path))];
+      for (const path of folders) expanded.add(path);
+    } else scanError = `Could not restore the workspace: ${(error as Error).message}`;
+  }
   const subscribers = new Set<ReadableStreamDefaultController>();
   const encoder = new TextEncoder();
   const notify = (documentChanged = false) => { revision++; for (const client of subscribers) { try { client.enqueue(encoder.encode(`${documentChanged ? "" : "event: workspace\n"}data: ${revision}\n\n`)); } catch { subscribers.delete(client); } } };
   let historyQueue = Promise.resolve();
+  let workspaceQueue = Promise.resolve();
+  async function persistWorkspace() {
+    const bytes = JSON.stringify({ folders, expanded: [...expanded] }, null, 2);
+    workspaceQueue = workspaceQueue.catch(() => {}).then(async () => {
+      const temp = `${workspacePath}.tmp`;
+      await writeFile(temp, bytes); await rename(temp, workspacePath);
+    });
+    await workspaceQueue;
+  }
+  if (migrateWorkspace) await persistWorkspace();
   async function remember(path: string, kind: string) {
     recent = [{ path, name: basename(path), kind }, ...recent.filter(item => item.path !== path)].slice(0, 24);
     const bytes = JSON.stringify(recent, null, 2);
@@ -29,20 +55,24 @@ export async function startService(options: { port?: number; stateDirectory?: st
     });
     await historyQueue;
   }
-  function discover(path: string) {
+  function discover() {
     worker?.terminate();
     const generation = ++scanGeneration;
-    root = path; files = []; expanded.clear(); scanning = true; scanError = ''; notify();
+    files.clear(); scanning = folders.length > 0; scanError = ''; notify();
+    if (!scanning) { worker = undefined; return; }
     worker = new Worker(new URL('./scan-worker.ts', import.meta.url).href);
     worker.onmessage = event => {
       if (generation !== scanGeneration) return;
-      if (event.data.paths) files.push(...event.data.paths);
+      if (event.data.paths) {
+        const found = files.get(event.data.root) ?? [];
+        found.push(...event.data.paths); files.set(event.data.root, found);
+      }
       if (event.data.error) scanError = event.data.error;
-      if (event.data.done) { scanning = false; files.sort(); worker?.terminate(); worker = undefined; }
+      if (event.data.done) { scanning = false; worker?.terminate(); worker = undefined; }
       notify();
     };
     worker.onerror = event => { if (generation !== scanGeneration) return; scanError = event.message; scanning = false; notify(); };
-    worker.postMessage({ root: path });
+    worker.postMessage({ roots: folders });
   }
   let checking = false, lastStamp = "";
   async function sync(force = true) {
@@ -66,7 +96,11 @@ export async function startService(options: { port?: number; stateDirectory?: st
     path = path.startsWith('~/') ? join(homedir(), path.slice(2)) : resolve(path);
     const canonical = await realpath(path);
     const info = await stat(canonical);
-    if (info.isDirectory()) { await remember(canonical, 'folder'); discover(canonical); return; }
+    if (info.isDirectory()) {
+      if (!folders.includes(canonical)) folders.push(canonical);
+      expanded.add(canonical);
+      await persistWorkspace(); await remember(canonical, 'folder'); discover(); return;
+    }
     const next = await documents.read(canonical);
     fileWatcher?.close(); fileWatcher = undefined;
     active = next; opened.add(next.path); documentError = ''; lastStamp = '';
@@ -74,10 +108,10 @@ export async function startService(options: { port?: number; stateDirectory?: st
     catch { /* periodic refresh still detects replacements when a watcher is unavailable */ }
     await remember(next.path, 'file'); notify(true);
   }
-  function entries(query: string) {
+  function folderEntries(root: string, query: string) {
     const normalizedQuery = query.toLowerCase();
     const visible = new Map<string, { path: string; name: string; depth: number; directory: boolean; expanded: boolean }>();
-    for (const path of files) {
+    for (const path of files.get(root) ?? []) {
       const rel = relative(root, path), parts = rel.split(sep);
       if (query && !rel.toLowerCase().includes(normalizedQuery)) continue;
       let parent = root;
@@ -97,6 +131,15 @@ export async function startService(options: { port?: number; stateDirectory?: st
         return aa[i].localeCompare(bb[i]);
       }
       return aa.length - bb.length;
+    });
+  }
+  function entries(query: string) {
+    return folders.flatMap(folder => {
+      const isExpanded = query !== '' || expanded.has(folder);
+      return [
+        { id: encodeURIComponent(folder), path: folder, name: basename(folder), depth: 0, directory: true, expanded: isExpanded, workspaceFolder: true },
+        ...(isExpanded ? folderEntries(folder, query).map(entry => ({ ...entry, id: `${encodeURIComponent(folder)}--${encodeURIComponent(entry.path)}`, depth: entry.depth + 1, workspaceFolder: false })) : []),
+      ];
     });
   }
   const port = options.port ?? 47931;
@@ -121,13 +164,18 @@ export async function startService(options: { port?: number; stateDirectory?: st
       try {
         if (url.pathname === '/api/workspace') {
           if (url.searchParams.get('since') === String(revision)) return json({ unchanged: true });
-          return json({ revision, root, activePath: active?.path ?? '', activeName: active ? basename(active.path) : 'No drawing open', scanning, scanCount: files.length, error: scanError || documentError, entries: entries(url.searchParams.get('query') ?? ''), recent });
+          return json({ revision, root: folders[0] ?? '', folders, activePath: active?.path ?? '', activeName: active ? basename(active.path) : 'No drawing open', scanning, scanCount: new Set([...files.values()].flat()).size, error: scanError || documentError, entries: entries(url.searchParams.get('query') ?? ''), recent: recent.map(item => ({ ...item, id: encodeURIComponent(item.path) })) });
         }
         if (url.pathname === '/api/document') return json({ snapshot: active, error: documentError });
         if (url.pathname === '/api/sync' && request.method === 'POST') { await sync(); return json({ ok: true }); }
         if (url.pathname === '/api/open' && request.method === 'POST') { const body = await request.json(); await open(body.path); return json({ ok: true }); }
-        if (url.pathname === '/api/toggle' && request.method === 'POST') { const { path } = await request.json(); if (expanded.has(path)) expanded.delete(path); else expanded.add(path); notify(); return json({ ok: true }); }
-        if (url.pathname === '/api/rescan' && request.method === 'POST') { if (root) discover(root); return json({ ok: true }); }
+        if (url.pathname === '/api/toggle' && request.method === 'POST') { const { path } = await request.json(); if (expanded.has(path)) expanded.delete(path); else expanded.add(path); await persistWorkspace(); notify(); return json({ ok: true }); }
+        if (url.pathname === '/api/remove-folder' && request.method === 'POST') {
+          const { path } = await request.json();
+          folders = folders.filter(folder => folder !== path); expanded.delete(path);
+          await persistWorkspace(); discover(); return json({ ok: true });
+        }
+        if (url.pathname === '/api/rescan' && request.method === 'POST') { discover(); return json({ ok: true }); }
         if (url.pathname === '/api/save' && request.method === 'POST') {
           const body = await request.json();
           if (!opened.has(body.path)) throw new FileError('Open the drawing before saving it.', 403);
@@ -159,6 +207,7 @@ export async function startService(options: { port?: number; stateDirectory?: st
       } catch (reason) { return json({ error: (reason as Error).message }, reason instanceof FileError ? reason.status : 400); }
     },
   });
+  if (folders.length) discover();
   return { server, token, open, sync, stop() { clearInterval(poll); worker?.terminate(); fileWatcher?.close(); for (const client of subscribers) { try { client.close(); } catch {} } server.stop(true); } };
 }
 

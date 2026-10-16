@@ -1,11 +1,14 @@
 shape Entry
+  id: string
   path: string
   name: string
   depth: number
   directory: bool
   expanded: bool
+  workspaceFolder: bool
 
 shape Recent
+  id: string
   path: string
   name: string
   kind: string
@@ -29,7 +32,6 @@ shape PickerSupport
   available: bool
 
 component ExactDraw
-  state path = ""
   state query = ""
   state sidebarOpen = true
   resource nativePicker = pickerAvailable() as shape PickerSupport else empty()
@@ -42,13 +44,8 @@ component ExactDraw
     sidebarOpen = not sidebarOpen
   action refreshWorkspace
     refresh workspace
-  action editPath(value: string)
-    path = value
   action search(value: string)
     query = value
-  action openPath
-    if path.trim() != ""
-      send changed = openLocation(path.trim())
   action browse(kind: string)
     send changed = chooseLocation(kind)
   action openRecent(value: string)
@@ -60,6 +57,8 @@ component ExactDraw
       send changed = openLocation(value)
   action rescan
     send changed = rescanFolder()
+  action removeFolder(value: string)
+    send changed = removeWorkspaceFolder(value)
   view
     main testId="app" width="100%" height="100%" display="flex" flex-direction="column" accent-color="-exact-system-indigo"
       row flex=1 min-height=0
@@ -76,9 +75,6 @@ component ExactDraw
                 text "Open drawing…"
               button press=browse("folder") disabled=pending(changed) buttonStyle="bordered" testId="open-folder"
                 text "Open folder…"
-            input value=path input=editPath submit=openPath placeholder="File or folder path" aria-label="File or folder path" testId="path" min-width=0
-            button press=openPath disabled=(path.trim() == "") buttonStyle="bordered" testId="open"
-              text "Open path"
             if actionError != ""
               text actionError color="-exact-system-red" font="-exact-footnote" testId="action-error" overflow-wrap="anywhere"
             if workspace.error != ""
@@ -91,12 +87,15 @@ component ExactDraw
               input value=query input=search placeholder="Find a drawing" aria-label="Find a drawing" testId="search" min-width=0
               text (workspace.scanning ? `Discovering… ${workspace.scanCount} ${workspace.scanCount == 1 ? "drawing" : "drawings"}` : `${workspace.scanCount} ${workspace.scanCount == 1 ? "drawing" : "drawings"}`) font="-exact-footnote" color="-exact-secondary-label" testId="scan-status"
               list virtualized=true flex=1 min-height=0 testId="explorer"
-                for entry in workspace.entries key=entry.path
+                for entry in workspace.entries key=entry.id
                   row min-height=32 padding-left=(entry.depth * 14)
-                    button press=activate(entry.path, entry.directory) appearance="none" aria-label=entry.path testId=`entry-${entry.path}` flex=1 min-width=0
+                    button press=activate(entry.path, entry.directory) appearance="none" aria-label=entry.path testId=`entry-${entry.id}` flex=1 min-width=0
                       row gap=6 align-items="center"
                         text (entry.directory ? (entry.expanded ? "▾" : "▸") : "◇") color="-exact-secondary-label"
                         text entry.name text-overflow="ellipsis" min-width=0 flex=1
+                    if entry.workspaceFolder
+                      button press=removeFolder(entry.path) aria-label=`Remove ${entry.name} from workspace` testId=`remove-${entry.id}`
+                        text "Remove"
             else
               column flex=1 justify-content="center" gap=8 padding="20px 4px"
                 text "Your drawings,\nwhere they belong." font-size=22 font-weight=600
@@ -106,7 +105,7 @@ component ExactDraw
               list virtualized=true height=170 min-height=80 testId="recent"
                 for item in workspace.recent key=item.path
                   row min-height=38
-                    button press=openRecent(item.path) appearance="none" aria-label=item.path testId=`recent-${item.path}` flex=1 min-width=0
+                    button press=openRecent(item.path) appearance="none" aria-label=item.path testId=`recent-${item.id}` flex=1 min-width=0
                       column gap=2
                         text item.name text-overflow="ellipsis"
                         text item.kind color="-exact-secondary-label" font="-exact-caption1"

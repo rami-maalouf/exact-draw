@@ -29,7 +29,7 @@ const sources: Sources = {
   pickerAvailable: (_args, _store, _storage, native) => ({ available: native?.available === true }),
   chooseLocation: async ([kind], _store, _storage, native) => {
     try {
-      if (!native?.available) return { ok: false, error: 'Use the path field to open a location on this platform.' };
+      if (!native?.available) return { ok: false, error: 'Open new locations using the macOS app.' };
       const selected = await native.later({ op: 'choose', kind });
       if (selected.cancelled === true) return { ok: true, error: '' };
       if (typeof selected.path !== 'string' || !selected.path) throw new Error('The chooser did not return a path.');
@@ -56,5 +56,6 @@ const sources: Sources = {
   openLocation: ([path]) => action('/api/open', { path }),
   toggleFolder: ([path]) => action('/api/toggle', { path }),
   rescanFolder: () => action('/api/rescan', {}),
+  removeWorkspaceFolder: ([path]) => action('/api/remove-folder', { path }),
 };
 export const answer: Answer = (source, args, store, storage, native) => sources[source](args, store, storage, native);

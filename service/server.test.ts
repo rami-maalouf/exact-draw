@@ -41,7 +41,54 @@ test('serves new disk revisions, scans without replacing the active drawing, and
     service = await startService({ port: 0, stateDirectory });
     const restored = await call('/api/workspace');
     expect(restored.recent.map((entry: { path: string }) => entry.path)).toEqual([root, path]);
+    expect(restored.folders).toEqual([root]);
+    expect(restored.entries.some((entry: { path: string; workspaceFolder: boolean }) => entry.path === root && entry.workspaceFolder)).toBe(true);
   } finally { service.stop(); await rm(root, { recursive: true, force: true }); }
+});
+
+test('keeps all workspace folders through restart, unavailable folders, and explicit removal', async () => {
+  const home = await realpath(await mkdtemp(join(tmpdir(), 'draw-folders-')));
+  const first = join(home, 'first'), second = join(home, 'second');
+  await mkdir(first); await mkdir(second);
+  const path = join(first, 'one.excalidraw');
+  await writeFile(path, drawing('#ffffff'));
+  await writeFile(join(second, 'two.excalidraw'), drawing('#abcdef'));
+  const options = { port: 0, stateDirectory: join(home, 'state') };
+  let service = await startService(options);
+  const call = (route: string, body?: unknown) => fetch(`http://127.0.0.1:${service.server.port}${route}`, { headers: { authorization: `Bearer ${service.token}`, 'content-type': 'application/json' }, ...(body ? { method: 'POST', body: JSON.stringify(body) } : {}) }).then(r => r.json());
+  const settled = async () => {
+    let state = await call('/api/workspace');
+    const deadline = Date.now() + 3000;
+    while (state.scanning && Date.now() < deadline) { await Bun.sleep(10); state = await call('/api/workspace'); }
+    expect(state.scanning).toBe(false);
+    return state;
+  };
+  try {
+    await service.open(path); await service.open(first); await service.open(second); await service.open(first);
+    let state = await settled();
+    expect(state.folders).toEqual([first, second]);
+    expect(state.scanCount).toBe(2);
+    expect(state.activePath).toBe(path);
+    await call('/api/toggle', { path: second });
+    service.stop(); service = await startService(options);
+    state = await settled();
+    expect(state.folders).toEqual([first, second]);
+    expect(state.entries.find((entry: { path: string }) => entry.path === second).expanded).toBe(false);
+    service.stop(); await rename(second, `${second}-moved`); service = await startService(options);
+    state = await settled();
+    expect(state.folders).toEqual([first, second]);
+    expect(state.entries.some((entry: { path: string }) => entry.path === second)).toBe(true);
+    expect(state.error).toContain('Could not read');
+    await service.open(path);
+    await call('/api/remove-folder', { path: first });
+    expect((await call('/api/document')).snapshot.path).toBe(path);
+    expect(await Bun.file(path).exists()).toBe(true);
+    await call('/api/remove-folder', { path: second });
+    service.stop(); service = await startService(options);
+    state = await settled();
+    expect(state.folders).toEqual([]);
+    expect(state.entries).toEqual([]);
+  } finally { service.stop(); await rm(home, { recursive: true, force: true }); }
 });
 
 test('a folder enumeration warning does not become an active-document error', async () => {

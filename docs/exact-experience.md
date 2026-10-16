@@ -76,6 +76,18 @@ Verified in the real native UI: open a drawing through the chooser, open its fol
 
 Framework opportunity: a documented way to hand a user-selected document to an app-owned background service, including persistent access and sandbox scope, would make this architecture easier to support.
 
+## 008: workspace persistence belongs outside recent history
+
+Status: implemented and covered by restart tests.
+
+The first service remembered recent locations but did not restore explorer roots. The workspace now persists all selected folders and their expansion state in `workspace.json`, independently of the capped recent list. The initial upgrade imports previously selected folders from that history. One worker scans all roots on startup. Unavailable and empty folders remain visible until explicitly removed; removal never touches drawing files.
+
+The path-entry field was removed in favor of the native selectors. The web preview can browse existing workspace roots and recent files; selecting new filesystem locations remains a macOS operation.
+
+The revised shell test exposed an Exact agent targeting issue: a raw path in a test ID such as `recent-/…/First.excalidraw` was interpreted as a view/part target when tapped. Encoding path components in IDs resolved it while retaining the real path as the accessibility label. This was an app naming mistake exposed by stronger interaction coverage, not a filesystem failure.
+
+Validation: eight filesystem/service tests (42 assertions), TypeScript and Contract checks, restored-workspace shell tests on web and macOS, and `exact verify` on web with no findings in 5.6 seconds. A real macOS relaunch restored the previously selected folders without input and showed no path field; the previously open drawing was reopened through recent history.
+
 ## Measured commands and qualification
 
 Exact's `.exact/commands.jsonl` records timestamps, revision, exit and elapsed milliseconds automatically. These are command durations, not total engineering time:
