@@ -65,13 +65,12 @@ component ExactDraw
   view
     main testId="app" width="100%" height="100%" display="flex" flex-direction="column" accent-color="-exact-system-indigo"
       row flex=1 min-height=0
-        column width=(sidebarOpen ? 280 : 44) flex-shrink=0 padding=(sidebarOpen ? 12 : 8) gap=12 background-color="-exact-secondary-background"
-          row gap=8 align-items="center"
-            button press=toggleSidebar aria-label=(sidebarOpen ? "Hide sidebar" : "Show sidebar") aria-expanded=sidebarOpen testId="toggle-sidebar" width=28 height=28
-              text (sidebarOpen ? "‹" : "›")
-            if sidebarOpen
+        if sidebarOpen
+          column testId="sidebar" width=280 flex-shrink=0 padding=12 gap=12 background-color="-exact-secondary-background"
+            row gap=8 align-items="center"
+              button press=toggleSidebar aria-label="Hide sidebar" aria-expanded=sidebarOpen testId="toggle-sidebar" width=28 height=28
+                text "‹"
               text workspace.activeName flex=1 min-width=0 text-overflow="ellipsis" font="-exact-footnote" color="-exact-secondary-label" testId="active-name"
-          if sidebarOpen
             text "WORKSPACE" font="-exact-caption1" color="-exact-secondary-label"
             if nativePicker.available
               button press=browse("file") disabled=pending(changed) buttonStyle="bordered" testId="open-drawing"
@@ -109,13 +108,16 @@ component ExactDraw
                       column gap=2
                         text item.name text-overflow="ellipsis"
                         text item.kind color="-exact-secondary-label" font="-exact-caption1"
-        column flex=1 min-width=0 min-height=0
+        column id="canvas-host" testId="canvas-host" flex=1 min-width=0 min-height=0 position="relative"
           if workspace.editorUrl != ""
             iframe src=workspace.editorUrl sandbox="allow-scripts allow-same-origin allow-downloads" flex=1 min-height=0 testId="drawing-editor"
           else
             column flex=1 align-items="center" justify-content="center" padding=24 gap=12
               text "Connecting to your workspace" font-size=24 font-weight=600
               text "Start Exact Draw with bun run start." color="-exact-secondary-label"
+          if not sidebarOpen
+            button press=toggleSidebar aria-label="Show sidebar" aria-expanded=false testId="show-sidebar" position="absolute" left=64 top=16 width=82 height=36 z-index=10 background-color="-exact-background" color="-exact-label" border-radius=8 box-shadow="0 2px 8px rgba(0, 0, 0, 0.12)"
+              text "Sidebar"
       column id="folder-menu" popover="auto" role="menu" aria-label="Folder actions"
         button press=removeFolder(menuFolder) popovertarget="folder-menu" popovertargetaction="hide" testId="remove-workspace-folder"
           text "Remove from workspace"

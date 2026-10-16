@@ -96,6 +96,12 @@ Workspace roots now use `contextPopover` with a shared menu. The row's `contextm
 
 The shell E2E right-clicks a root and chooses Remove from workspace, then verifies that another root and the current drawing remain. The first native test returned a stale-build error instead of rebuilding automatically, despite `exact.mjs help mac` saying it would rebuild. Running `bun exact.mjs mac --bundle` explicitly resolved it, and both hosts passed.
 
+## 010: collapse the sidebar without remounting the editor
+
+Status: verified in the native app and covered by the web Contract test.
+
+The sidebar is conditionally removed from layout instead of shrinking to a narrow rail. The editor stays in the same canvas container, and an absolutely positioned Sidebar button restores the explorer. Native interaction confirmed that the embedded frame stays mounted across both transitions and that the button renders above the web view. No native extension or framework workaround was needed. The existing web verification passed with these sidebar changes, including the hide and reopen assertions.
+
 ## Measured commands and qualification
 
 Exact's `.exact/commands.jsonl` records timestamps, revision, exit and elapsed milliseconds automatically. These are command durations, not total engineering time:
