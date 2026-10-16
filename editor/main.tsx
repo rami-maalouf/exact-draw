@@ -192,10 +192,8 @@ function Editor() {
   }, [api]);
 
   return <main className="editor-shell">
-    <header className="document-header">
-      <div className="document-identity"><span className="document-label">DRAWING</span><strong>{path ? path.split('/').pop() : 'Your next idea starts here'}</strong><span className="document-path" data-testid="active-path" title={path}>{path || 'Open a drawing from the sidebar'}</span></div>
-      <div role="status" aria-live="polite" data-testid="save-status" className={`save-status status-${status.toLowerCase()}`}><span className="status-dot" />{status}</div>
-    </header>
+    <span className="visually-hidden" data-testid="active-path">{path}</span>
+    <div className="visually-hidden" role="status" aria-live="polite" data-testid="save-status">{status}</div>
     {notice && <div className={`notice ${conflict ? 'notice-conflict' : ''}`} role="alert"><span>{notice}</span>{conflict ? <button onClick={() => void useDiskRef.current()}>Use disk version</button> : <button onClick={() => void saveRef.current().catch(error => setNotice(error.message))}>Retry</button>}</div>}
     <section className={`canvas-region ${path ? '' : 'canvas-empty'}`} aria-label="Drawing editor">
       <Excalidraw excalidrawAPI={setApi} onChange={(elements, state, files) => changedRef.current(elements, state, files)} initialData={{ libraryItems: readLibrary() }} onLibraryChange={items => { try { localStorage.setItem('exact-draw-library', JSON.stringify(items)); } catch { setNotice('The library could not be saved locally. Export the library to keep a copy.'); } }} viewModeEnabled={conflict || loading || !path} UIOptions={{ canvasActions: { loadScene: false, saveToActiveFile: false, export: { saveFileToDisk: true } } }}>
@@ -203,7 +201,6 @@ function Editor() {
       </Excalidraw>
       {!path && <div className="empty-state"><div className="paper-mark" aria-hidden="true"><span /><span /><span /></div><p className="eyebrow">EXACT DRAW</p><h1>A canvas for your thinking.</h1><p>Open an <strong>.excalidraw</strong> file or a folder in the sidebar.<br />Your drawings stay on your filesystem, ready for you and your agents.</p><div className="empty-details"><span>Edits save automatically</span><span>External changes appear here</span></div></div>}
     </section>
-    <footer className="document-footer"><span>{path ? 'Local file · Autosave enabled' : '.excalidraw files only'}</span><span>Changes from disk refresh automatically</span></footer>
   </main>;
 }
 createRoot(document.getElementById('root')!).render(<Editor />);
