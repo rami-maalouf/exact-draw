@@ -27,13 +27,10 @@ The intended editing model is taking turns, rather than simultaneous collaborati
 
 Installed macOS app, captured October 16, 2026, with the canvas extending to the top of the window.
 
-**Sidebar open:** folder explorer, recent drawings, and the full-height canvas.
-
-![Exact Draw with the sidebar open](docs/screenshots/sidebar-open.jpg)
-
-**Sidebar hidden:** full-width, full-height canvas with a floating sidebar toggle.
-
-![Exact Draw with the sidebar hidden](docs/screenshots/sidebar-closed.jpg)
+| Sidebar open | Sidebar hidden |
+| --- | --- |
+| ![Exact Draw with the sidebar open](docs/screenshots/sidebar-open.jpg) | ![Exact Draw with the sidebar hidden](docs/screenshots/sidebar-closed.jpg) |
+| Folder explorer, recent drawings, and the full-height canvas. | Full-width, full-height canvas with a floating sidebar toggle. |
 
 ## Current status
 
