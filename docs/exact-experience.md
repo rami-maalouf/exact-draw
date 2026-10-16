@@ -122,6 +122,50 @@ Exact's manifest icons produced `AppIcon.icns` and the bundle's `CFBundleIconFil
 
 Framework opportunity: the resource-copy and signing hooks work, but readiness, helper ownership, startup errors, and parent-exit handling are app code. A supported companion-service lifecycle would remove that integration work.
 
+## 013: full-window content is supported, but hard to discover by intent
+
+Status: implemented and visually verified on macOS in commits `5702345` and `285e5a9`; recorded retrospectively on 2026-10-16 against the baseline above.
+
+Removing the gray native titlebar needed one existing Contract attribute: `viewport-fit="cover"` on the root. Exact's macOS `coverChrome()` maps it to AppKit full-size content, transparent titlebar, hidden title, and no separator when there is no window toolbar. No new Swift code or framework patch was needed. The sidebar could retain `padding-top="calc(env(safe-area-inset-top) + 12px)"` while the canvas filled its pane.
+
+The first implementation still padded the canvas and painted the exposed strip white. That was my interpretation mistake: matching the bar's color did not give the drawing that space. Removing the canvas padding and background let the existing Excalidraw background-color and theme controls affect the full canvas. Native inspection confirmed a nonwhite background and dark mode reached the top, with the sidebar both visible and hidden.
+
+Discovery took more investigation than the small change warranted. `contract vocab viewport-fit` reported a string property without values or macOS behavior. Looking up `safe-area-inset-top` treated it as an unknown tag or attribute; it did not point to CSS `env(...)`. The start guide and card did not surface this titlebar recipe, so I used examples and host source to establish the behavior.
+
+Framework opportunity: make searches for "transparent titlebar", "remove gray bar", and "edge-to-edge canvas" lead to a tested macOS recipe. Have vocabulary lookup show accepted values, a minimal example, safe-area usage, and the native-toolbar caveat. The declarative capability itself is a strength worth preserving.
+
+## 014: a full-size web guest still needs to avoid native window controls
+
+Status: workaround visually verified in `285e5a9`; superseded by the app-owned header in `837a172`. This records the original integration cost, not the current layout prescription.
+
+Once the canvas extended under the titlebar, hiding the sidebar put the embedded editor's upper-left menu under the macOS window buttons. Exact deliberately gives its macOS WebKit guest zero automatic safe-area insets because Contract already owns the iframe's frame. That avoids double padding, but I did not find a documented way to expose the native controls' occupied area to the guest while keeping its canvas full size.
+
+The app temporarily passed `windowControls=1` in the editor URL, used native-picker availability as a native-host proxy, and moved only the guest's first menu column down 32 px. Its floating sidebar button moved to 48 px from the top on native. This worked in the inspected window, but used fixed geometry and an Excalidraw DOM selector. It was not qualified across fullscreen, all window sizes, or macOS versions. The later header change removed the query flag and guest menu override.
+
+Framework opportunity: document an opt-in host-to-guest geometry channel, with updates when layout changes. Local rectangles for overlapping window controls would be more useful here than mandatory padding across the entire top edge. Keep iframe sizing under Contract's control; expose geometry so embedded applications can place their own controls.
+
+Verification lesson: an iframe-exists assertion cannot establish that the guest loaded or that its controls are reachable. A supported fixture should wait for guest readiness and inspect sidebar-open and sidebar-hidden states, light/dark appearance, and a nonwhite canvas. Some blank captures in my first isolated preview came from missing editor assets and load timing in my fixture, not an established Exact renderer defect.
+
+## 015: installation support exists; updating a specific installed app took manual work
+
+Status: local `/Applications` replacement and relaunch verified for `285e5a9`; existing installer behavior confirmed from framework source afterward.
+
+I built from the committed app snapshot because other work was changing the shared checkout. After packaging the companion and editor, I staged the new bundle, verified its signature, quit the installed app, preserved the old bundle, replaced it, and reopened the user's drawing. Snapshot isolation was workspace coordination, not an Exact limitation. I reused the standalone packaging from entry 012; the titlebar task did not implement that service lifecycle.
+
+I missed Exact's existing `install` command during deployment. Its implementation targets `~/Applications`, copies the built bundle, registers it with Launch Services, and creates a CLI shim. It would be inaccurate to report that Exact has no installer. The inspected implementation removes the target before copying and does not expose the explicit `/Applications` destination, backup/rollback, or quit/relaunch flow used here.
+
+Framework opportunity: improve discovery of the existing installer and extend it with destination selection and a recoverable update flow. Document how a scaffolded app's packaging command feeds installation, including bundled helpers. Repeated builds, a Bun PATH mismatch, and fixture mistakes also added friction in this session; no reliable total engineering-time measurement was kept.
+
+## 016: the tracked feedback diary needs a direct agent entry point
+
+Status: documentation gap observed and corrected in the app's `AGENTS.md` on 2026-10-16.
+
+The README and build plan linked this journal, but the agent instructions only pointed to `exact.mjs feedback status`. That command describes a separate gitignored `.exact/diary/` submission workflow. A future session could follow those instructions without finding this durable project history. I had read the journal during the feedback discussion but had not yet written this session's findings into it.
+
+The project-owned section of `AGENTS.md` now directs agents to read and maintain this journal, distinguish evidence from interpretation, and mark superseded approaches. The generated Exact block remains unchanged.
+
+Framework opportunity: let projects register a tracked experience journal and have `feedback status` identify it alongside submission diaries. The two serve different audiences, but their relationship should be explicit so useful findings are not lost or duplicated.
+
 ## Measured commands and qualification
 
 Exact's `.exact/commands.jsonl` records timestamps, revision, exit and elapsed milliseconds automatically. These are command durations, not total engineering time:

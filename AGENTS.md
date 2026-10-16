@@ -17,6 +17,13 @@ Generated, so don't edit: `exact.mjs`, `rust-toolchain.toml`, `.cargo/config.tom
 `Cargo.toml`'s `[patch.crates-io]` and this block.
 <!-- exact:end -->
 
+## Exact framework feedback diary
+
+- Read [docs/exact-experience.md](docs/exact-experience.md) before working on Exact integration, native behavior, packaging, or framework feedback. This is the project's shared, versioned record of what worked, what was difficult, and what would improve Exact.
+- Add meaningful findings as you work. Record what you tried, the observed result, the solution or workaround, and a concrete framework improvement. Include successful capabilities worth preserving, not only problems. Extend an existing entry when it covers the same finding.
+- Separate reproduced behavior, source-confirmed limitations, hypotheses, and agent mistakes. Name the platform and relevant revision; state what was actually verified. Label superseded workarounds so historical entries are not mistaken for current implementation advice. Do not invent timings or infer native success from browser tests.
+- Exact's `.exact/diary/` and `feedback` command are a separate submission workflow; they do not replace this tracked diary. Updating this document does not authorize sending feedback externally.
+
 ## Git workflow
 
 - Work directly on `main` and push there unless explicitly asked to use a branch or pull request.
