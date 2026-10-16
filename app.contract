@@ -128,17 +128,16 @@ component ExactDraw
                           row color="-exact-secondary-label"
                             DrawIcon(name="file", size=14)
                           text drawingName(item.name) font-size=12 text-overflow="ellipsis" min-width=0 flex=1
-        // the editor's default paper is white in either system appearance; its theme is independent.
-        column id="canvas-host" testId="canvas-host" flex=1 min-width=0 min-height=0 position="relative" padding-top="env(safe-area-inset-top)" background-color="light-dark(#ffffff, #ffffff)"
+        column id="canvas-host" testId="canvas-host" flex=1 min-width=0 min-height=0 position="relative"
           if workspace.editorUrl != ""
-            iframe src=workspace.editorUrl sandbox="allow-scripts allow-same-origin allow-downloads" flex=1 min-height=0 testId="drawing-editor"
+            iframe src=(nativePicker.available ? `${workspace.editorUrl}&windowControls=1` : workspace.editorUrl) sandbox="allow-scripts allow-same-origin allow-downloads" flex=1 min-height=0 testId="drawing-editor"
           else
             column flex=1 align-items="center" justify-content="center" padding=24 gap=12
               image "assets/brand/logo.png" width=96 height=96 object-fit="contain" aria-hidden=true
               text "Connecting to your workspace" font-size=24 font-weight=600
               text "Start Exact Draw with bun run start." color="-exact-secondary-label"
           if not sidebarOpen
-            button press=toggleSidebar aria-label="Show sidebar" title="Show sidebar" aria-expanded=false testId="show-sidebar" position="absolute" left=64 top="calc(env(safe-area-inset-top) + 16px)" width=36 height=36 display="flex" align-items="center" justify-content="center" z-index=10 background-color="-exact-background" color="-exact-label" border-radius=8 box-shadow="0 2px 8px rgba(0, 0, 0, 0.12)"
+            button press=toggleSidebar aria-label="Show sidebar" title="Show sidebar" aria-expanded=false testId="show-sidebar" position="absolute" left=64 top=(nativePicker.available ? 48 : 16) width=36 height=36 display="flex" align-items="center" justify-content="center" z-index=10 background-color="-exact-background" color="-exact-label" border-radius=8 box-shadow="0 2px 8px rgba(0, 0, 0, 0.12)"
               DrawIcon(name="sidebar", size=20)
       column id="folder-menu" popover="auto" role="menu" aria-label="Folder actions"
         button press=removeFolder(menuFolder) popovertarget="folder-menu" popovertargetaction="hide" testId="remove-workspace-folder"
