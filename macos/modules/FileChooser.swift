@@ -2,8 +2,9 @@ import AppKit
 import UniformTypeIdentifiers
 
 final class FileChooser: ExactModule {
-    private var panel: NSOpenPanel?
+    private var panel: NSSavePanel?
     private let drawingFilter = DrawingFilter()
+    private let destinationFilter = DrawingFilter(rejectExisting: true)
     private var service: Process?
     private var serviceOutput: Pipe?
     private var serviceLog: FileHandle?
@@ -14,6 +15,10 @@ final class FileChooser: ExactModule {
     override func later(_ request: [String: Any], reply: ExactReply) {
         if request["op"] as? String == "start-service" {
             startService(reply)
+            return
+        }
+        if request["op"] as? String == "destination" {
+            chooseDestination(request, reply: reply)
             return
         }
         guard request["op"] as? String == "choose",
@@ -36,6 +41,42 @@ final class FileChooser: ExactModule {
             chooser.allowedContentTypes = [UTType(filenameExtension: "excalidraw") ?? .data]
             chooser.delegate = drawingFilter
         }
+        present(chooser, reply: reply)
+    }
+
+    private func chooseDestination(_ request: [String: Any], reply: ExactReply) {
+        guard let kind = request["kind"] as? String, ["new", "save-as", "move"].contains(kind) else {
+            reply.fail("Unknown drawing destination request.")
+            return
+        }
+        guard panel == nil else { reply.fail("A file chooser is already open."); return }
+        let chooser = NSSavePanel()
+        switch kind {
+        case "new":
+            chooser.title = "New drawing"
+            chooser.prompt = "Create"
+        case "move":
+            chooser.title = "Move drawing"
+            chooser.prompt = "Move"
+        default:
+            chooser.title = "Save drawing as"
+            chooser.prompt = "Save"
+        }
+        chooser.allowedContentTypes = [UTType(filenameExtension: "excalidraw") ?? .data]
+        chooser.allowsOtherFileTypes = false
+        chooser.canCreateDirectories = true
+        chooser.treatsFilePackagesAsDirectories = false
+        chooser.nameFieldStringValue = request["name"] as? String ?? "Untitled.excalidraw"
+        chooser.delegate = destinationFilter
+        if let path = request["path"] as? String, !path.isEmpty {
+            let url = URL(fileURLWithPath: path)
+            let directory = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+            chooser.directoryURL = directory ? url : url.deletingLastPathComponent()
+        }
+        present(chooser, reply: reply)
+    }
+
+    private func present(_ chooser: NSSavePanel, reply: ExactReply) {
         panel = chooser
         let finish: (NSApplication.ModalResponse) -> Void = { [weak self, weak chooser] response in
             self?.panel = nil
@@ -142,6 +183,13 @@ final class FileChooser: ExactModule {
 }
 
 private final class DrawingFilter: NSObject, NSOpenSavePanelDelegate {
+    private let rejectExisting: Bool
+
+    init(rejectExisting: Bool = false) {
+        self.rejectExisting = rejectExisting
+        super.init()
+    }
+
     func panel(_ sender: Any, shouldEnable url: URL) -> Bool {
         let directory = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
         return directory || url.pathExtension == "excalidraw"
@@ -150,6 +198,9 @@ private final class DrawingFilter: NSObject, NSOpenSavePanelDelegate {
     func panel(_ sender: Any, validate url: URL) throws {
         guard url.pathExtension == "excalidraw" else {
             throw NSError(domain: "ExactDraw", code: 1, userInfo: [NSLocalizedDescriptionKey: "Choose a .excalidraw drawing."])
+        }
+        if rejectExisting && FileManager.default.fileExists(atPath: url.path) {
+            throw NSError(domain: "ExactDraw", code: 2, userInfo: [NSLocalizedDescriptionKey: "A drawing already exists at this location. Choose a new name or another folder."])
         }
     }
 }
