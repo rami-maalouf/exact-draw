@@ -94,7 +94,9 @@ Read Exact's `docs/start-here.md` in the adjacent checkout before changing Contr
 
 ## Keyboard shortcuts
 
-Declare shell shortcuts on their action buttons in `app.contract` using Exact's `aria-keyshortcuts`. Use `-exact-menu` to place each command in the appropriate native menu, and include the shortcut in the button's tooltip. This keeps clicking, keyboard input, accessibility, and the macOS menu connected to the same action without a separate event handler or shortcut registry.
+Declare shortcuts for persistent shell buttons in `app.contract` using Exact's `aria-keyshortcuts` and `-exact-menu`. Commands inside closed popovers are not registered by that mechanism. The native module therefore owns the persistent File menu, while a separate `handleNativeMenu` resource forwards its events through the same editor save barrier as shell commands. Keep this resource independent of workspace polling so refreshes cannot cancel a pending native picker.
+
+Command-W always means Close Drawing and is disabled without a drawing. Close Window remains available in the native File menu. Its shortcut is deliberately not reassigned based on polled state, which could otherwise close the window while an open command is completing.
 
 The sidebar button declares `aria-keyshortcuts="Meta+b"` and `-exact-menu="view"`. Its label and tooltip follow the current visibility. New shortcuts should include a Contract interaction test and native verification with both the shell and embedded canvas focused.
 
@@ -115,11 +117,11 @@ For E2E testing, choose a browser executable if Brave is not installed:
 export CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 ```
 
-Quit the development app and stop its launcher before the shell suite, which needs port 47931. Build the native bundle explicitly to avoid a stale-build refusal:
+The shell suite copies the source into a temporary sibling project with its own app identity, dynamic service port, and state. It builds its native bundle and can run alongside the installed app:
 
 ```sh
-bun exact.mjs mac --bundle
 bun tests/editor.e2e.ts
+bun tests/lifecycle.e2e.ts
 bun tests/shell.e2e.ts
 ```
 
@@ -135,31 +137,23 @@ The benchmark creates a temporary dataset of 5,000 drawings, ignored dependency 
 
 ### Exact's visual verification
 
-`exact verify` builds the web shell, runs `app.test.contract`, and checks light/dark layouts at two sizes. It needs the companion service running. With the normal app stopped, this command starts an isolated test service and cleans it up afterward:
+`exact verify` builds the web shell, runs `app.test.contract`, and checks light/dark layouts at two sizes. This fixture gives it an isolated companion, identity, and state so the installed app can keep running:
 
 ```sh
 bun run build:editor
 bun - <<'JS'
-import { startService } from './service/server';
+import { createShellFixture } from './tests/shell-fixture';
 
-const service = await startService({
-  port: 47931,
-  stateDirectory: '.exact/verify-workspace',
-  testLoopbackOrigins: true,
-});
+const fixture = await createShellFixture();
 try {
-  const child = Bun.spawn([process.execPath, 'exact.mjs', 'verify'], {
-    stdout: 'inherit',
-    stderr: 'inherit',
-  });
-  process.exitCode = await child.exited;
+  await fixture.run(['exact.mjs', 'verify']);
 } finally {
-  service.stop();
+  await fixture.dispose();
 }
 JS
 ```
 
-The `testLoopbackOrigins` exception allows the test runner's temporary browser origin. Keep it confined to test services. Verification screenshots are written under `.exact/verify/`.
+The fixture's `testLoopbackOrigins` exception allows the test runner's temporary browser origin. Keep it confined to test services. To retain screenshots under the fixture's `.exact/verify/`, pass `true` to `dispose` and use the printed fixture path.
 
 ## Local data and recovery
 
@@ -167,12 +161,24 @@ Normal launches store workspace state and recovery copies under `~/Library/Appli
 
 - `workspace.json`: added folders and their expansion state.
 - `recent.json`: recent location history. The UI filters this to drawing files; older folder history also supports workspace migration.
+- `document-session.json`: the active and last closed drawing paths.
 - `recovery/`: previous disk versions and preserved conflicting edits.
+- `recovery/documents.sqlite`: stable document identities, complete revision snapshots, and interrupted-move records. SQLite uses WAL and synchronous FULL. The latest 50 revisions per drawing are retained; explicit checkpoints count toward this limit.
+- `recovery/trash/`: drawings removed through the app. Trash is app-owned, separate from Finder Trash, and retained until restoration.
 
 Drawing files remain at their original paths. Removing a workspace root does not delete its contents. The editor also keeps pending edits in a browser-local draft to survive quick reloads; large embedded images can exceed that storage quota, in which case the UI asks you to keep the window open until Saved.
 
+Rename and Move retain the document ID and history. Save As and Duplicate create independent drawings with their own history. History captures initial opens, changed autosaves, observed external revisions, explicit checkpoints, and restores. Restoring adds a revision and preserves the replaced content within the retention limit. New, Save As, Move, and Trash restoration reject occupied destinations. In Recently Deleted, expand Restore to another location to enter a full `.excalidraw` path in an existing folder when the original location is missing or occupied.
+
+Recent locations and reopen state are secondary to completed filesystem changes. If their persistence fails, the canvas follows the completed action and the shell reports a warning that a restart may reopen older locations. The warning clears after a later successful lifecycle action.
+
+The editor consumes shell file commands after flushing pending edits. If the current file has disappeared or a save cannot complete, opening another file or closing the drawing first preserves unsaved content in a recovery copy. Operations that change the existing file require resolving its save warning.
+
 ## Current technical limits
 
+- Stable identity follows moves made through Exact Draw. Finder moves are not tracked automatically. History lives in this Mac's application data, not inside the portable drawing file.
+- Full revision snapshots include embedded assets. Retention limits revision count, not total bytes. Trash has no automatic expiry or permanent-delete UI in this milestone.
+- Exclusive publication requires hard-link support on the destination filesystem. Move stages data on the destination volume, and interrupted transfers are reconciled on startup; unsupported filesystems fail without replacing an existing destination. Tests cover process interruption, not sudden-power-loss durability.
 - The local build is unsandboxed. Saved paths are not security-scoped bookmarks; persistent sandbox access still needs qualification.
 - iCloud placeholder downloads, coordinated cloud writes, Finder document associations, and very large image-heavy drawings are not yet qualified.
 - Native shell interactions and embedded editor rendering have been verified. Browser drawing gestures are automated; native pointer drawing still needs a dedicated manual verification pass because the computer-use drag tool failed to target the window.

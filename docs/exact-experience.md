@@ -210,3 +210,53 @@ Independent review caught app-level coordination issues: scan warnings sharing t
 Synthetic local discovery benchmark: 5,000 drawings, 5,000 ignored dependency files, one unrelated 4 GiB sparse file; discovery 27 ms, 30 concurrent active-document requests, p95 0.19 ms and max 0.88 ms. The active drawing was preserved. This measures service responsiveness with warm local data, not native frame timing, cloud enumeration or downloading 4 GiB.
 
 Still unqualified: iCloud placeholders/coordinated writes, sandbox bookmarks, very large image drawings, notarized public distribution. Finder launch with the bundled service is now verified locally. Browser-level gestures do not by themselves prove macOS WebKit input behavior.
+
+## 018: file commands must cross the shell/editor boundary before touching disk
+
+Status: implemented against exact2 `b0e24ded45`; browser lifecycle and recovery flows, service tests, and web/macOS shell Contract flows verified on 2026-10-16.
+
+The shell exposes a Drawing popover while the sidebar is hidden; persistent native File commands require the module workaround in entry 020. NSSavePanel fits the existing native module interface for New, Save As, and Move destinations. The official Excalidraw guest supplies the history dialog and SVG previews, so inspecting an old version never changes the live canvas.
+
+A shell action cannot safely move or replace the active file immediately: the guest may still have a pending autosave. The app now queues a command in its local service; the guest consumes it, flushes pending edits, then performs the version-checked filesystem operation. A browser test draws and immediately renames, confirming that the renamed file contains the new shape. Another reproduced a blocked open after an external deletion. Navigation now preserves unsaved content in a recovery file before leaving an unavailable or conflicting drawing. Both clean and dirty missing-file navigation are covered separately from the existing conflict tests.
+
+The durable store is app code, not an Exact feature. SQLite stores stable IDs, complete revision bytes, and interrupted-transfer records. App-initiated moves keep identity and history, copies start independent histories, and restore adds a recoverable revision. Tests cover retention of 50 revisions, occupied destinations, stale versions, restart persistence, and interrupted moves with external replacements. Finder moves are not identity-tracked; full snapshots can consume substantial space with embedded images. Sudden power loss and cloud coordination remain unqualified.
+
+Framework opportunity: provide a documented shell-to-guest command/acknowledgement recipe with readiness, cancellation, and a before-document-change save barrier. The existing native module and menu primitives are sufficient; lifecycle ownership and safe guest coordination currently need an app-specific protocol.
+
+## 019: shell tests need their own service and application identity
+
+Status: isolated web and macOS Contract shell workflows pass; native standalone qualification recorded separately below.
+
+The previous shell test required port 47931, which was occupied by the user's running installed app. Stopping that app or reusing its service would interfere with real drawings. The test now copies the source into a sibling fixture, uses a dynamic port and temporary state, and assigns a distinct native app identity. It builds its own standalone resources and retains an optional fixture for inspection. The existing app and shared checkout stay untouched.
+
+The native runner's pointer tap on the header sidebar toggle did not change state in this fixture, while the declared Command-B shortcut did and the Drawing popover remained reachable. A subsequent native accessibility click toggled the sidebar correctly. The automated test records shortcut behavior; the runner result does not establish a product pointer defect.
+
+Framework opportunity: support fixture overrides for app identity, companion-service endpoint, and state directory as part of test/verify. Today those values require a copied source fixture. Preserve the ability to drive the same Contract assertions on web and macOS, but report native input targeting failures with the target bounds and hit-test result.
+
+## 020: native File commands need stable lifetime and guest delivery
+
+Status: manually verified in an isolated standalone macOS bundle on 2026-10-16, with its own service on port 49689 and temporary state. The installed app on port 47931 was left running.
+
+Declarative `-exact-menu` actions inside a closed popover did not appear in the native File menu. The app now registers persistent File items through its Swift module. A `native.watch('file-menu')` resource forwards actions into the local service queue. Initially that listener lived in the polling workspace source; refreshing the source canceled long-lived picker replies. Giving the menu listener its own stable resource fixed this. Save As remained open through several workspace refreshes and completed successfully.
+
+Custom SSE command events did not reach the embedded guest in this native fixture even though the service accepted the command. The editor now also drains the command queue every second. A browser regression test suppresses the custom command listener and verifies delivery through this fallback. Buffering along the native embedding path is a hypothesis, not an established cause. Commands pause while a history, rename, or Trash dialog is open so another native action cannot discard unfinished dialog input.
+
+Final native testing also reproduced Command-O opening Exact's developer Open Project dialog instead of the drawing chooser. Source inspection confirmed a duplicate equivalent in the Develop menu. Exact's own shortcut controller clears competing equivalents before assigning app shortcuts because AppKit caches them. The app module now follows that pattern across the whole menu tree and restores displaced bindings on teardown. Command-W remains assigned to Close Drawing, including while that action is disabled, so polled document state cannot change it into Close Window.
+
+The final isolated bundle on port 50528 passed native Command-O/New/Save As chooser invocation and cancellation, Close Drawing, and a second Command-W with an empty canvas that kept the window open. The same source passed web/macOS shell tests and Exact verify at 390x844 and 1280x900 in light/dark appearances, including relaunch, without findings.
+
+Native qualification covered Save As from a focused guest, Close Drawing, Reopen Closed Drawing, version preview, explicit checkpoint, restoration as a new revision, Move through NSSavePanel, Rename, Trash confirmation, and Recently Deleted restoration with history intact. Command-N's native destination chooser was also inspected. Browser automation additionally covers immediate rename after drawing, conflicting destination rejection, and restoring Trash to an alternate full path when its original destination is occupied. The alternate path form requires an existing parent folder; it does not yet open a native destination picker. OS chooser interactions are manually qualified, not automated by the current Exact runner. Native pointer drawing remains separately unqualified.
+
+An early fixture launched from Documents stalled before the helper's readiness message, with no error in its log. The same bundled helper worked from the command line. Copying the preview bundle and its state into a system temporary directory allowed standalone launch. Protected-folder access is a possible explanation; this did not establish a TCC defect. The helper now supports this isolated preview layout.
+
+Framework feedback: register menu commands independently of view visibility; document resource cancellation semantics for native sheets; provide a shell-to-guest command completion channel and an automated native menu/chooser driver. These are concrete gaps encountered with this baseline, rather than evidence that Exact supplies document storage or history itself.
+
+## 021: completed disk changes must remain authoritative during recovery
+
+Status: failure-injection tests pass for app-owned storage and secondary state persistence.
+
+Review found two interruption cases worth preserving in tests. A source edited in place before a move completes must retain its identity when the staged destination is rolled back; an entirely different file recreated at that path must not take the moved document's identity. Transfer records now retain source device/inode to distinguish them. A failed SQLite registration after exclusive file creation removes only the unchanged file owned by that operation, allowing a safe same-path retry.
+
+A case-only rename initially failed as an occupied destination on the local case-insensitive macOS volume. The browser test reproduced `Renamed` to `RENAMED` failing before the fix. Same-file canonical aliases now use a journaled native rename; separate hardlinks and other occupied targets remain protected. Tests cover identity/history retention and restart on either side of that rename.
+
+Recent-location or reopen-state writes can fail after a move or Trash operation has already committed. The service now updates the active document and notifies the guest before attempting those secondary writes. It reports persistence failures as a shell warning while returning the completed action successfully. Tests inject both write failures, verify active identity and Trash state, and confirm later persistence recovery. These are app-level design lessons, not Exact framework defects.
