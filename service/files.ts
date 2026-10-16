@@ -46,7 +46,8 @@ export class Documents {
     return result;
   }
   close() { this.store?.close(); this.store = undefined; }
-  private async readCurrent(path: string, source = 'external'): Promise<Snapshot> {
+  async closeWhenIdle() { await this.queue; this.close(); }
+  private async readCurrent(path: string): Promise<Snapshot> {
     if (!path.endsWith('.excalidraw')) throw new FileError('Only .excalidraw files are supported.');
     const canonical = await realpath(path);
     if (!canonical.endsWith('.excalidraw') || !(await lstat(canonical)).isFile()) throw new FileError('Choose a regular .excalidraw file.');
@@ -55,7 +56,7 @@ export class Documents {
     const existing = this.store!.find(canonical);
     const record = existing ?? this.store!.register(canonical);
     const version = digest(bytes);
-    this.store!.record(record.id, bytes, version, existing ? source : 'open');
+    this.store!.record(record.id, bytes, version, existing ? 'external' : 'open');
     return { id: record.id, path: canonical, version, document };
   }
   read(path: string): Promise<Snapshot> { return this.run(() => this.readCurrent(path)); }
@@ -64,8 +65,8 @@ export class Documents {
     if (current.version !== version) throw new FileError('The file changed on disk. Your edits were not written over it.', 409);
     return current;
   }
-  save(path: string, version: string, document: Drawing, source = 'save'): Promise<Snapshot> {
-    return this.run(() => this.writeCurrent(path, version, document, source));
+  save(path: string, version: string, document: Drawing): Promise<Snapshot> {
+    return this.run(() => this.writeCurrent(path, version, document, 'save'));
   }
   private async writeCurrent(path: string, version: string, document: Drawing, source: string): Promise<Snapshot> {
     validateDrawing(document);
@@ -98,16 +99,20 @@ export class Documents {
     const destination = await this.destination(path);
     const validated = validateDrawing(document);
     const bytes = encode(validated);
-    // publish a fully written file exclusively, so an interrupted create never exposes partial json.
     const temporary = `${destination}.${randomUUID()}.tmp`;
     try {
       await durableWrite(temporary, bytes);
       try { await link(temporary, destination); }
       catch (error) { if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new FileError('A file already exists at that destination.', 409); throw error; }
-      const record = this.store!.fresh(destination);
       const version = digest(bytes);
-      this.store!.record(record.id, bytes, version, source);
-      return { id: record.id, path: destination, version, document: validated };
+      try {
+        const record = this.store!.fresh(destination, bytes, version, source);
+        return { id: record.id, path: destination, version, document: validated };
+      } catch (error) {
+        const staged = await lstat(temporary), target = await exists(destination);
+        if (target?.dev === staged.dev && target.ino === staged.ino && digest(await readFile(destination, 'utf8')) === version) await unlink(destination);
+        throw error;
+      }
     } finally { await rm(temporary, { force: true }); }
   }
   create(path: string, document: Drawing = { type: 'excalidraw', version: 2, elements: [], appState: {}, files: {} }) {
@@ -119,11 +124,20 @@ export class Documents {
   private async transfer(current: Snapshot, destination: string, kind: Transfer['kind']): Promise<Snapshot> {
     const target = await this.destination(destination);
     if (target === current.path) return current;
-    const transfer: Transfer = { id: current.id, source: current.path, destination: target, temporary: `${target}.${randomUUID()}.tmp`, version: current.version, kind, deletedAt: kind === 'trash' ? new Date().toISOString() : null };
+    const sourceInfo = await lstat(current.path);
+    const targetInfo = await exists(target);
+    if (kind === 'move' && targetInfo?.isFile() && targetInfo.dev === sourceInfo.dev && targetInfo.ino === sourceInfo.ino && await realpath(target) === current.path) kind = 'case-rename';
+    const transfer: Transfer = { id: current.id, source: current.path, sourceDevice: sourceInfo.dev, sourceInode: sourceInfo.ino, destination: target, temporary: `${target}.${randomUUID()}.tmp`, version: current.version, kind, deletedAt: kind === 'trash' ? new Date().toISOString() : null };
     const bytes = await readFile(current.path, 'utf8');
     if (digest(bytes) !== current.version) throw new FileError('The file changed on disk. Please reload it.', 409);
     this.store!.begin(transfer);
     try {
+      if (kind === 'case-rename') {
+        await this.checked(current.path, current.version);
+        await rename(current.path, target);
+        this.store!.finish(transfer);
+        return { ...current, path: target };
+      }
       await durableWrite(transfer.temporary, bytes, (await lstat(current.path)).mode);
       try { await link(transfer.temporary, target); }
       catch (error) { if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new FileError('A file already exists at that destination.', 409); throw error; }
@@ -138,18 +152,27 @@ export class Documents {
     }
   }
   private async reconcile(transfer: Transfer) {
+    if (transfer.kind === 'case-rename') {
+      for (const path of [transfer.destination, transfer.source]) {
+        const info = await exists(path);
+        if (info?.dev === transfer.sourceDevice && info.ino === transfer.sourceInode) {
+          this.store!.finish({ ...transfer, destination: await realpath(path) });
+          return;
+        }
+      }
+      this.store!.cancel(transfer.id);
+      return;
+    }
     const staged = await exists(transfer.temporary);
     const target = await exists(transfer.destination);
     const source = await exists(transfer.source);
     const ownsTarget = staged && target && staged.ino === target.ino && staged.dev === target.dev;
-    const sourceUnchanged = source?.isFile() && digest(await readFile(transfer.source, 'utf8')) === transfer.version;
-    if (ownsTarget && !sourceUnchanged) this.store!.finish(transfer);
+    const originalSourcePresent = source?.dev === transfer.sourceDevice && source?.ino === transfer.sourceInode;
+    if (ownsTarget && !originalSourcePresent) this.store!.finish(transfer);
     else if (ownsTarget) {
-      // before source removal, rollback only our own unchanged destination; keep external edits.
       if (digest(await readFile(transfer.destination, 'utf8')) === transfer.version) await unlink(transfer.destination);
       this.store!.cancel(transfer.id);
-    } else if (staged && !sourceUnchanged) {
-      // an external replacement may leave the staging file as the only intact original.
+    } else if (staged && !originalSourcePresent) {
       const bytes = await readFile(transfer.temporary, 'utf8');
       if (digest(bytes) !== transfer.version) throw new FileError('An interrupted move needs recovery. Its staging file has been preserved.', 409);
       const recoveryPath = join(await realpath(this.recoveryDirectory), `interrupted-move-${randomUUID()}.excalidraw`);

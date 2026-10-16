@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 export type Revision = { id: string; createdAt: string; source: string; version: string };
 export type Record = { id: string; path: string; originalPath: string | null; deletedAt: string | null };
-export type Transfer = { id: string; source: string; destination: string; temporary: string; version: string; kind: 'move' | 'trash' | 'restore'; deletedAt: string | null };
+export type Transfer = { id: string; source: string; sourceDevice: number; sourceInode: number; destination: string; temporary: string; version: string; kind: 'move' | 'trash' | 'restore' | 'case-rename'; deletedAt: string | null };
 
 export class History {
   private db: Database;
@@ -18,7 +18,7 @@ export class History {
       CREATE TABLE IF NOT EXISTS documents (id TEXT PRIMARY KEY, path TEXT UNIQUE NOT NULL, originalPath TEXT, deletedAt TEXT);
       CREATE TABLE IF NOT EXISTS revisions (sequence INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT UNIQUE NOT NULL, documentId TEXT NOT NULL, createdAt TEXT NOT NULL, source TEXT NOT NULL, version TEXT NOT NULL, bytes TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS revisions_document ON revisions(documentId, sequence);
-      CREATE TABLE IF NOT EXISTS transfers (id TEXT PRIMARY KEY, source TEXT NOT NULL, destination TEXT NOT NULL, temporary TEXT NOT NULL, version TEXT NOT NULL, kind TEXT NOT NULL, deletedAt TEXT);
+      CREATE TABLE IF NOT EXISTS transfers (id TEXT PRIMARY KEY, source TEXT NOT NULL, sourceDevice INTEGER NOT NULL, sourceInode INTEGER NOT NULL, destination TEXT NOT NULL, temporary TEXT NOT NULL, version TEXT NOT NULL, kind TEXT NOT NULL, deletedAt TEXT);
     `);
   }
   close() { this.db.close(); }
@@ -48,19 +48,22 @@ export class History {
   trash() { return this.db.query<Record, []>('SELECT * FROM documents WHERE deletedAt IS NOT NULL ORDER BY deletedAt DESC').all(); }
   pending() { return this.db.query<Transfer, []>('SELECT * FROM transfers').all(); }
   begin(transfer: Transfer) {
-    this.db.query('INSERT INTO transfers (id, source, destination, temporary, version, kind, deletedAt) VALUES (?, ?, ?, ?, ?, ?, ?)').run(transfer.id, transfer.source, transfer.destination, transfer.temporary, transfer.version, transfer.kind, transfer.deletedAt);
+    this.db.query('INSERT INTO transfers (id, source, sourceDevice, sourceInode, destination, temporary, version, kind, deletedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(transfer.id, transfer.source, transfer.sourceDevice, transfer.sourceInode, transfer.destination, transfer.temporary, transfer.version, transfer.kind, transfer.deletedAt);
   }
   cancel(id: string) { this.db.query('DELETE FROM transfers WHERE id = ?').run(id); }
   finish(transfer: Transfer) {
     this.db.transaction(() => {
-      // a missing file at a reused destination must not inherit the old document's identity.
       this.db.query("UPDATE documents SET path = 'missing:' || id WHERE path = ? AND id != ?").run(transfer.destination, transfer.id);
       this.db.query('UPDATE documents SET path = ?, originalPath = ?, deletedAt = ? WHERE id = ?').run(transfer.destination, transfer.kind === 'trash' ? transfer.source : null, transfer.deletedAt, transfer.id);
       this.cancel(transfer.id);
     })();
   }
-  fresh(path: string) {
-    this.db.query("UPDATE documents SET path = 'missing:' || id WHERE path = ?").run(path);
-    return this.register(path);
+  fresh(path: string, bytes: string, version: string, source: string) {
+    return this.db.transaction(() => {
+      this.db.query("UPDATE documents SET path = 'missing:' || id WHERE path = ?").run(path);
+      const record = this.register(path);
+      this.record(record.id, bytes, version, source);
+      return record;
+    })();
   }
 }

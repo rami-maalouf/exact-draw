@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startService } from './server';
@@ -69,4 +69,41 @@ test('queues native commands without changing the active file before the editor 
     expect((await call('/api/command/take', {})).data.command.action).toBe('new');
     expect((await call('/api/command/take', {})).data.command).toBeNull();
   } finally { service.stop(); await rm(root, { recursive: true, force: true }); }
+});
+
+test('keeps completed file actions active when recent or reopen state cannot be persisted', async () => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'draw-state-failure-')));
+  const stateDirectory = join(root, 'state');
+  const service = await startService({ port: 0, stateDirectory });
+  const call = async (route: string, body?: unknown) => {
+    const response = await fetch(`http://127.0.0.1:${service.server.port}${route}`, {
+      headers: { authorization: `Bearer ${service.token}`, 'content-type': 'application/json' },
+      ...(body === undefined ? {} : { method: 'POST', body: JSON.stringify(body) }),
+    });
+    return { status: response.status, data: await response.json() };
+  };
+  try {
+    const created = await call('/api/lifecycle', { action: 'new', destination: join(root, 'First.excalidraw') });
+    const first = created.data.snapshot;
+    await mkdir(join(stateDirectory, 'recent.json.tmp'));
+    await mkdir(join(stateDirectory, 'document-session.json.tmp'));
+    const moved = await call('/api/lifecycle', { action: 'rename', path: first.path, version: first.version, name: 'Moved' });
+    expect(moved.status).toBe(200);
+    const current = (await call('/api/document')).data;
+    expect(current.snapshot.path).toBe(join(root, 'Moved.excalidraw'));
+    expect(current.snapshot.id).toBe(first.id);
+    expect(current.error).toBe('');
+    expect(await Bun.file(first.path).exists()).toBe(false);
+    expect(await Bun.file(current.snapshot.path).exists()).toBe(true);
+    expect((await call('/api/workspace')).data.error).toContain('drawing action completed');
+    const trashed = await call('/api/lifecycle', { action: 'trash', path: current.snapshot.path, version: current.snapshot.version });
+    expect(trashed.status).toBe(200);
+    expect((await call('/api/document')).data.snapshot).toBeNull();
+    expect((await call('/api/trash')).data.entries[0].id).toBe(first.id);
+    await rm(join(stateDirectory, 'recent.json.tmp'), { recursive: true });
+    await rm(join(stateDirectory, 'document-session.json.tmp'), { recursive: true });
+    expect((await call('/api/lifecycle', { action: 'restore-trash', id: first.id })).status).toBe(200);
+    expect((await call('/api/workspace')).data.error).toBe('');
+    expect(JSON.parse(await readFile(join(stateDirectory, 'document-session.json'), 'utf8')).activePath).toBe(current.snapshot.path);
+  } finally { await service.stop(); await rm(root, { recursive: true, force: true }); }
 });

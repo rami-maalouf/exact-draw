@@ -1,5 +1,5 @@
 import { watch, type FSWatcher } from 'node:fs';
-import { mkdir, readFile, realpath, rename, stat, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readFile, realpath, rename, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { Documents, FileError, type Snapshot } from './files';
@@ -22,7 +22,7 @@ export async function startService(options: { port?: number; stateDirectory?: st
   let recent: { path: string; name: string; kind: string }[] = [];
   try { recent = JSON.parse(await readFile(historyPath, 'utf8')); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') console.error('Could not restore recent locations:', error); }
   const token = crypto.randomUUID();
-  let revision = 1, scanning = false, scanError = '', documentError = '', active: Snapshot | null = null;
+  let revision = 1, scanning = false, scanError = '', documentError = '', sessionError = '', active: Snapshot | null = null;
   let folders: string[] = [];
   let migrateWorkspace = false;
   const files = new Map<string, string[]>();
@@ -119,11 +119,18 @@ export async function startService(options: { port?: number; stateDirectory?: st
       opened.add(next.path);
       try { fileWatcher = watch(dirname(next.path), (_event, name) => { if (!name || String(name) === basename(next.path)) void sync(); }); }
       catch { /* periodic refresh still detects replacements when a watcher is unavailable */ }
-      if (rememberFile) await remember(next.path, 'file');
+      if (rememberFile) recent = [{ path: next.path, name: basename(next.path), kind: 'file' }, ...recent.filter(item => item.path !== next.path)].slice(0, 24);
     }
-    const temp = `${sessionPath}.tmp`;
-    await writeFile(temp, JSON.stringify({ activePath: next?.path ?? '', lastClosedPath }));
-    await rename(temp, sessionPath);
+    notify(true);
+    const failures: string[] = [];
+    try { await persistRecent(); }
+    catch (error) { failures.push(`recent locations: ${(error as Error).message}`); }
+    try {
+      const temp = `${sessionPath}.tmp`;
+      await writeFile(temp, JSON.stringify({ activePath: next?.path ?? '', lastClosedPath }));
+      await rename(temp, sessionPath);
+    } catch (error) { failures.push(`reopen state: ${(error as Error).message}`); }
+    sessionError = failures.length ? `The drawing action completed, but could not save ${failures.join('; ')}. This session is current; reopening the app may show older locations.` : '';
     notify(true);
   }
   async function open(path: string) {
@@ -159,6 +166,8 @@ export async function startService(options: { port?: number; stateDirectory?: st
             const stem = before.path.slice(0, -'.excalidraw'.length);
             for (let index = 1; ; index++) {
               const destination = `${stem} copy${index === 1 ? '' : ` ${index}`}.excalidraw`;
+              try { await lstat(destination); continue; }
+              catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
               try { next = await documents.duplicate(before.path, before.version, destination); break; }
               catch (error) { if (!(error instanceof FileError) || error.status !== 409 || !error.message.includes('already exists')) throw error; }
             }
@@ -181,7 +190,6 @@ export async function startService(options: { port?: number; stateDirectory?: st
       opened.delete(before.path);
       recent = recent.filter(item => item.path !== before.path);
       if (lastClosedPath === before.path) lastClosedPath = next?.path ?? '';
-      await persistRecent();
     }
     await activate(next);
     if (!['close', 'checkpoint', 'restore-history'].includes(body.action)) discover();
@@ -247,7 +255,7 @@ export async function startService(options: { port?: number; stateDirectory?: st
       try {
         if (url.pathname === '/api/workspace') {
           if (url.searchParams.get('since') === String(revision)) return json({ unchanged: true });
-          return json({ revision, root: folders[0] ?? '', folders, activePath: active?.path ?? '', activeName: active ? basename(active.path) : 'No drawing open', scanning, scanCount: new Set([...files.values()].flat()).size, error: scanError || documentError, entries: entries(url.searchParams.get('query') ?? ''), recent: recent.map(item => ({ ...item, id: encodeURIComponent(item.path) })) });
+          return json({ revision, root: folders[0] ?? '', folders, activePath: active?.path ?? '', activeName: active ? basename(active.path) : 'No drawing open', scanning, scanCount: new Set([...files.values()].flat()).size, error: scanError || documentError || sessionError, entries: entries(url.searchParams.get('query') ?? ''), recent: recent.map(item => ({ ...item, id: encodeURIComponent(item.path) })) });
         }
         if (url.pathname === '/api/document') return json({ snapshot: active, error: documentError });
         if (url.pathname === '/api/command' && request.method === 'POST') {
@@ -320,7 +328,12 @@ export async function startService(options: { port?: number; stateDirectory?: st
     catch (error) { documentError = `Could not reopen drawing: ${(error as Error).message}`; }
   }
   if (folders.length) discover();
-  return { server, token, open, sync, stop() { clearInterval(poll); worker?.terminate(); fileWatcher?.close(); for (const client of subscribers) { try { client.close(); } catch {} } server.stop(true); } };
+  return { server, token, open, sync, stop() {
+    clearInterval(poll); worker?.terminate(); fileWatcher?.close();
+    for (const client of subscribers) { try { client.close(); } catch {} }
+    server.stop(true);
+    return operationQueue.then(() => documents.closeWhenIdle());
+  } };
 }
 
 if (import.meta.main) {

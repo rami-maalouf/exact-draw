@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'bun:test';
-import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, rm, lstat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { Documents } from './files';
@@ -11,6 +11,10 @@ afterEach(async () => {
   for (const directory of directories.splice(0)) await rm(directory, { recursive: true, force: true });
 });
 const scene = (name: string) => ({ type: 'excalidraw' as const, version: 2, elements: [], appState: { name }, files: {}, custom: 'preserved' });
+async function sourceIdentity(path: string) {
+  const info = await lstat(path);
+  return { sourceDevice: info.dev, sourceInode: info.ino };
+}
 async function fixture() {
   const directory = await mkdtemp(join(tmpdir(), 'exact-history-'));
   directories.push(directory);
@@ -58,6 +62,61 @@ test('history persists across restart, records external revisions and previews w
   stores.push(reopened);
   expect((await reopened.read(path)).id).toBe(created.id);
   expect(await reopened.history(path)).toEqual(history);
+});
+
+test('case-only rename preserves identity and history without accepting a separate hardlink destination', async () => {
+  const { link, realpath } = await import('node:fs/promises');
+  const { documents, path, directory } = await fixture();
+  const created = await documents.create(path, scene('original'));
+  const destination = join(directory, 'DRAWING.excalidraw');
+  const moved = await documents.move(created.path, created.version, destination);
+  expect(moved.id).toBe(created.id);
+  expect(await realpath(destination)).toBe(moved.path);
+  expect(await documents.history(moved.path)).toHaveLength(1);
+  const other = join(directory, 'other.excalidraw');
+  await link(moved.path, other);
+  await expect(documents.move(moved.path, moved.version, other)).rejects.toThrow('already exists');
+  expect(await readFile(other, 'utf8')).toBe(await readFile(moved.path, 'utf8'));
+});
+
+test('restart reconciles both sides of an interrupted case-only rename', async () => {
+  const { History } = await import('./history');
+  const { rename, realpath } = await import('node:fs/promises');
+  for (const renamed of [false, true]) {
+    const { documents, path, recovery } = await fixture();
+    const created = await documents.create(path, scene('original'));
+    documents.close();
+    const destination = join(dirname(created.path), 'DRAWING.excalidraw');
+    const history = new History(recovery);
+    history.begin({ id: created.id, source: created.path, ...await sourceIdentity(created.path), destination, temporary: `${destination}.tmp`, version: created.version, kind: 'case-rename', deletedAt: null });
+    if (renamed) await rename(created.path, destination);
+    history.close();
+    const reopened = new Documents(recovery);
+    stores.push(reopened);
+    const actual = await realpath(renamed ? destination : created.path);
+    const current = await reopened.read(actual);
+    expect(current.id).toBe(created.id);
+    expect(current.path).toBe(actual);
+    expect(await reopened.history(actual)).toHaveLength(1);
+  }
+});
+
+test('failed history registration leaves a new destination available for retry', async () => {
+  const { Database } = await import('bun:sqlite');
+  const { documents, path, directory, recovery } = await fixture();
+  const original = await documents.create(path, scene('original'));
+  const destination = join(directory, 'copy.excalidraw');
+  const db = new Database(join(recovery, 'documents.sqlite'));
+  try {
+    db.exec("CREATE TRIGGER fail_revision BEFORE INSERT ON revisions BEGIN SELECT RAISE(ABORT, 'disk full'); END");
+    await expect(documents.duplicate(path, original.version, destination)).rejects.toThrow('disk full');
+    await expect(readFile(destination)).rejects.toThrow();
+    expect((await documents.read(path)).id).toBe(original.id);
+    db.exec('DROP TRIGGER fail_revision');
+    const copy = await documents.duplicate(path, original.version, destination);
+    expect(copy.document.appState.name).toBe('original');
+    expect(copy.id).not.toBe(original.id);
+  } finally { db.close(); }
 });
 
 test('restoring records a new revision and preserves the content replaced, rejecting stale versions', async () => {
@@ -119,7 +178,7 @@ test('restart rolls back an interrupted move before source removal and finalizes
     const destination = join(dirname(created.path), 'moved.excalidraw');
     const temporary = `${destination}.interrupted.tmp`;
     const history = new History(recovery);
-    history.begin({ id: created.id, source: created.path, destination, temporary, version: created.version, kind: 'move', deletedAt: null });
+    history.begin({ id: created.id, source: created.path, ...await sourceIdentity(created.path), destination, temporary, version: created.version, kind: 'move', deletedAt: null });
     await writeFile(temporary, await readFile(path));
     await link(temporary, destination);
     if (sourceRemoved) await unlink(path);
@@ -141,16 +200,19 @@ test('interrupted destination collision never removes an existing file or the so
   documents.close();
   const destination = join(directory, 'occupied.excalidraw');
   const temporary = `${destination}.interrupted.tmp`;
-  await writeFile(destination, await readFile(path));
+  const originalBytes = await readFile(path, 'utf8');
+  const occupiedBytes = JSON.stringify(scene('occupied'));
+  await writeFile(destination, occupiedBytes);
   await writeFile(temporary, await readFile(path));
   const history = new History(recovery);
-  history.begin({ id: created.id, source: created.path, destination, temporary, version: created.version, kind: 'move', deletedAt: null });
+  history.begin({ id: created.id, source: created.path, ...await sourceIdentity(created.path), destination, temporary, version: created.version, kind: 'move', deletedAt: null });
   history.close();
   const reopened = new Documents(recovery);
   stores.push(reopened);
   expect((await reopened.read(path)).id).toBe(created.id);
   expect((await reopened.read(destination)).id).not.toBe(created.id);
-  expect(await readFile(path, 'utf8')).toBe(await readFile(destination, 'utf8'));
+  expect(await readFile(path, 'utf8')).toBe(originalBytes);
+  expect(await readFile(destination, 'utf8')).toBe(occupiedBytes);
 });
 
 test('interrupted move preserves the original when another file replaces its old path', async () => {
@@ -162,7 +224,7 @@ test('interrupted move preserves the original when another file replaces its old
   const destination = join(dirname(created.path), 'moved.excalidraw');
   const temporary = `${destination}.interrupted.tmp`;
   const history = new History(recovery);
-  history.begin({ id: created.id, source: created.path, destination, temporary, version: created.version, kind: 'move', deletedAt: null });
+  history.begin({ id: created.id, source: created.path, ...await sourceIdentity(created.path), destination, temporary, version: created.version, kind: 'move', deletedAt: null });
   await writeFile(temporary, await readFile(path));
   await link(temporary, destination);
   await unlink(path);
@@ -176,6 +238,29 @@ test('interrupted move preserves the original when another file replaces its old
   expect((await reopened.read(path)).id).not.toBe(created.id);
 });
 
+test('interrupted move rolls back when the original source is edited in place', async () => {
+  const { History } = await import('./history');
+  const { link } = await import('node:fs/promises');
+  const { documents, path, recovery } = await fixture();
+  const created = await documents.create(path, scene('original'));
+  documents.close();
+  const destination = join(dirname(created.path), 'moved.excalidraw');
+  const temporary = `${destination}.interrupted.tmp`;
+  const history = new History(recovery);
+  history.begin({ id: created.id, source: created.path, ...await sourceIdentity(created.path), destination, temporary, version: created.version, kind: 'move', deletedAt: null });
+  await writeFile(temporary, await readFile(path));
+  await link(temporary, destination);
+  await writeFile(path, JSON.stringify(scene('external edit')));
+  history.close();
+  const reopened = new Documents(recovery);
+  stores.push(reopened);
+  const current = await reopened.read(path);
+  expect(current.id).toBe(created.id);
+  expect(current.document.appState.name).toBe('external edit');
+  await expect(readFile(destination)).rejects.toThrow();
+  await expect(readFile(temporary)).rejects.toThrow();
+});
+
 test('interrupted move recovers its intact staging copy after destination replacement', async () => {
   const { History } = await import('./history');
   const { link, unlink, readdir } = await import('node:fs/promises');
@@ -185,7 +270,7 @@ test('interrupted move recovers its intact staging copy after destination replac
   const destination = join(dirname(created.path), 'moved.excalidraw');
   const temporary = `${destination}.interrupted.tmp`;
   const history = new History(recovery);
-  history.begin({ id: created.id, source: created.path, destination, temporary, version: created.version, kind: 'move', deletedAt: null });
+  history.begin({ id: created.id, source: created.path, ...await sourceIdentity(created.path), destination, temporary, version: created.version, kind: 'move', deletedAt: null });
   await writeFile(temporary, await readFile(path));
   await link(temporary, destination);
   await unlink(path);
