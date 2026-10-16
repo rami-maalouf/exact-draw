@@ -3,3 +3,4 @@
 /node_modules/
 /app.contract.d.ts
 /.exact/
+/native-server/

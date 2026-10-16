@@ -69,10 +69,10 @@ component ExactDraw
   action hoverEntry(value: string, inside: bool)
     hoveredPath = inside ? value : ""
   view
-    main testId="app" width="100%" height="100%" display="flex" flex-direction="column" accent-color="-exact-system-indigo"
+    main testId="app" viewport-fit="cover" width="100%" height="100%" display="flex" flex-direction="column" accent-color="-exact-system-indigo"
       row flex=1 min-height=0
         if sidebarOpen
-          column testId="sidebar" width=288 flex-shrink=0 padding=12 gap=10 background-color="light-dark(#f7f7f9, #202024)" border-right="1px solid light-dark(#e6e6eb, #323238)" font-size=13
+          column testId="sidebar" width=288 flex-shrink=0 padding=12 padding-top="calc(env(safe-area-inset-top) + 12px)" gap=10 background-color="light-dark(#f7f7f9, #202024)" border-right="1px solid light-dark(#e6e6eb, #323238)" font-size=13
             row gap=8 align-items="center" padding="2px 4px 4px 6px"
               image "assets/brand/logo.png" width=32 height=32 object-fit="contain" aria-hidden=true flex-shrink=0
               column flex=1 min-width=0 gap=4
@@ -130,14 +130,14 @@ component ExactDraw
                           text drawingName(item.name) font-size=12 text-overflow="ellipsis" min-width=0 flex=1
         column id="canvas-host" testId="canvas-host" flex=1 min-width=0 min-height=0 position="relative"
           if workspace.editorUrl != ""
-            iframe src=workspace.editorUrl sandbox="allow-scripts allow-same-origin allow-downloads" flex=1 min-height=0 testId="drawing-editor"
+            iframe src=(nativePicker.available ? `${workspace.editorUrl}&windowControls=1` : workspace.editorUrl) sandbox="allow-scripts allow-same-origin allow-downloads" flex=1 min-height=0 testId="drawing-editor"
           else
             column flex=1 align-items="center" justify-content="center" padding=24 gap=12
               image "assets/brand/logo.png" width=96 height=96 object-fit="contain" aria-hidden=true
               text "Connecting to your workspace" font-size=24 font-weight=600
               text "Start Exact Draw with bun run start." color="-exact-secondary-label"
           if not sidebarOpen
-            button press=toggleSidebar aria-label="Show sidebar" title="Show sidebar" aria-expanded=false testId="show-sidebar" position="absolute" left=64 top=16 width=36 height=36 display="flex" align-items="center" justify-content="center" z-index=10 background-color="-exact-background" color="-exact-label" border-radius=8 box-shadow="0 2px 8px rgba(0, 0, 0, 0.12)"
+            button press=toggleSidebar aria-label="Show sidebar" title="Show sidebar" aria-expanded=false testId="show-sidebar" position="absolute" left=64 top=(nativePicker.available ? 48 : 16) width=36 height=36 display="flex" align-items="center" justify-content="center" z-index=10 background-color="-exact-background" color="-exact-label" border-radius=8 box-shadow="0 2px 8px rgba(0, 0, 0, 0.12)"
               DrawIcon(name="sidebar", size=20)
       column id="folder-menu" popover="auto" role="menu" aria-label="Folder actions"
         button press=removeFolder(menuFolder) popovertarget="folder-menu" popovertargetaction="hide" testId="remove-workspace-folder"

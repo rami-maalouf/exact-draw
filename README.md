@@ -25,19 +25,16 @@ The intended editing model is taking turns, rather than simultaneous collaborati
 
 ## Screenshots
 
-Current macOS app, captured October 16, 2026.
+Installed macOS app, captured October 16, 2026, with the canvas extending to the top of the window.
 
-**Sidebar open:** folder explorer, recent drawings, and the active canvas.
-
-![Exact Draw with the sidebar open](docs/screenshots/sidebar-open.jpg)
-
-**Sidebar hidden:** full-width canvas with a floating sidebar toggle.
-
-![Exact Draw with the sidebar hidden](docs/screenshots/sidebar-closed.jpg)
+| Sidebar open | Sidebar hidden |
+| --- | --- |
+| ![Exact Draw with the sidebar open](docs/screenshots/sidebar-open.jpg) | ![Exact Draw with the sidebar hidden](docs/screenshots/sidebar-closed.jpg) |
+| Folder explorer, recent drawings, and the full-height canvas. | Full-width, full-height canvas with a floating sidebar toggle. |
 
 ## Current status
 
-Exact Draw is an early local development build. It currently runs through a launcher that starts both the macOS app and its local file service; a standalone Finder-launchable release is still to come.
+Exact Draw is an early local macOS app. A packaged build launches directly from Applications and starts its bundled file service automatically. See [Developing Exact Draw](DEVELOPMENT.md) for building and installing it.
 
 It supports ordinary `.excalidraw` files. Obsidian's `.excalidraw.md` format, Obsidian plugins, live collaboration, and hosted sharing are outside the current implementation. iCloud placeholder handling and coordinated cloud writes have not been qualified, and very large image-heavy drawings need further profiling.
 

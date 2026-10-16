@@ -112,6 +112,16 @@ Exact's documented portable symbol roles do not include a sidebar or folder icon
 
 Validation: eight service tests with 42 assertions, TypeScript and Contract checks, file/folder/context-menu shell tests on web and macOS, and web verification at two sizes in both color schemes with no findings. The user's existing drawing was reopened, and the native expanded and collapsed layouts were inspected.
 
+## 012: a Finder-launchable bundle needs an app-owned service lifecycle
+
+Status: installed in `/Applications/Exact Draw.app` and launched without the development launcher.
+
+Copying the original bundle alone would leave the canvas disconnected because `scripts/start.ts` owned the file service. The standalone package now places Bun, bundled JavaScript for the service and scan worker, editor assets, and fonts in `Contents/Resources/server` through Exact's supported `host.macos.resources` mapping. The native module starts that helper on demand, waits for an explicit ready message, records startup errors, and terminates its own child on teardown. The helper also watches its parent's lifetime. The service accepts explicit resource paths so runtime reads do not depend on the source checkout.
+
+Exact's manifest icons produced `AppIcon.icns` and the bundle's `CFBundleIconFile` entry. The existing logo also renders in the sidebar. The installed bundle measured 112 MB, including its runtime. Deep code-signature verification passed, the bundled Bun executable ran, and the installed app restored saved folders, completed worker discovery, and reopened the user's drawing. Both its executable and helper ran from `/Applications`; quitting removed both processes. Filesystem/service tests and shell flows passed on web and macOS.
+
+Framework opportunity: the resource-copy and signing hooks work, but readiness, helper ownership, startup errors, and parent-exit handling are app code. A supported companion-service lifecycle would remove that integration work.
+
 ## Measured commands and qualification
 
 Exact's `.exact/commands.jsonl` records timestamps, revision, exit and elapsed milliseconds automatically. These are command durations, not total engineering time:
@@ -135,4 +145,4 @@ Independent review caught app-level coordination issues: scan warnings sharing t
 
 Synthetic local discovery benchmark: 5,000 drawings, 5,000 ignored dependency files, one unrelated 4 GiB sparse file; discovery 27 ms, 30 concurrent active-document requests, p95 0.19 ms and max 0.88 ms. The active drawing was preserved. This measures service responsiveness with warm local data, not native frame timing, cloud enumeration or downloading 4 GiB.
 
-Still unqualified: iCloud placeholders/coordinated writes, sandbox bookmarks, very large image drawings, signed distribution, Finder-only launch. Browser-level gestures do not by themselves prove macOS WebKit input behavior.
+Still unqualified: iCloud placeholders/coordinated writes, sandbox bookmarks, very large image drawings, notarized public distribution. Finder launch with the bundled service is now verified locally. Browser-level gestures do not by themselves prove macOS WebKit input behavior.

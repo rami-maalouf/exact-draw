@@ -25,6 +25,7 @@
       ]
     },
     "macos": {
+      "resources": [{ "from": "native-server", "to": "Resources/server" }],
       "minimumOS": "14.0",
       "window": {
         "width": 1280,

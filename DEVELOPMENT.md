@@ -47,7 +47,15 @@ export PATH="$HOME/.bun-1.4.2/bin:$PATH"
 bun --version
 ```
 
-`bun run start` builds the editor assets, starts the file service on `127.0.0.1:47931`, builds the native bundle, and launches the app. Keep the launcher running. Quitting the app stops the companion service. Launching the generated `.app` directly does not currently start that service.
+`bun run start` builds the bundled editor and service resources, starts the development file service on `127.0.0.1:47931`, builds the native bundle, and launches the app. Keep this development launcher running. Quitting the app stops its companion service.
+
+## Standalone macOS app
+
+Run `bun run package:macos` to build a self-contained `.app`; the command prints its path. Copy that bundle into `/Applications` and open it normally. It includes Bun, the bundled file service and scan worker, editor assets, fonts, and the app icon. It needs no source checkout, system Bun installation, or terminal launcher at runtime.
+
+The native module starts the bundled service when no service is listening, waits for its readiness message, and terminates it when the session closes. A parent-process check also ends the helper after an unexpected app exit. Errors go to `~/Library/Logs/Exact Draw/service.log`. Saved workspace and recovery data continue to live in `~/Library/Application Support/Exact Draw`.
+
+The installed copy is independent of subsequent source builds. Rebuild and replace it to install an update. This is a local signed build; notarized public distribution is a separate step. Run the installed app or the development launcher one at a time because they share a service port.
 
 In the app, choose **Open drawing** and select [`examples/Welcome.excalidraw`](examples/Welcome.excalidraw), or use **Add folder** to browse your own drawings. Only `.excalidraw` files are accepted.
 
@@ -159,7 +167,7 @@ Drawing files remain at their original paths. Removing a workspace root does not
 
 ## Current technical limits
 
-- The development build is unsandboxed. Saved paths are not security-scoped bookmarks; persistent sandbox access and standalone companion startup need packaging work.
+- The local build is unsandboxed. Saved paths are not security-scoped bookmarks; persistent sandbox access still needs qualification.
 - iCloud placeholder downloads, coordinated cloud writes, Finder document associations, and very large image-heavy drawings are not yet qualified.
 - Native shell interactions and embedded editor rendering have been verified. Browser drawing gestures are automated; native pointer drawing still needs a dedicated manual verification pass because the computer-use drag tool failed to target the window.
 - Saves check a digest before atomic replacement. That protects the intended alternating-editor workflow, but a non-cooperating external writer can still race between the check and rename. Simultaneous editing is not a collaborative merge workflow.

@@ -9,8 +9,8 @@ const run = async (args: string[], executable = process.execPath) => {
   activeChild = undefined;
   if (code) throw new Error(`Command failed (${code}): ${args.join(' ')}`);
 };
-await run(['scripts/build-editor.ts']);
 const web = process.argv.includes('--web');
+await run(web ? ['scripts/build-editor.ts'] : ['scripts/package-macos.ts', '--resources-only']);
 const service = await startService({ allowedOrigins: web ? ['http://127.0.0.1:8765'] : [] });
 for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => { activeChild?.kill(signal); service.stop(); process.exit(); });
 console.log('Local file service ready. Keep this launcher running while using Exact Draw.');

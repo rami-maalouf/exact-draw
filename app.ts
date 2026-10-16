@@ -3,11 +3,18 @@ export const appId = 'com.example.exact-draw-ba51d7';
 const API = 'http://127.0.0.1:47931';
 export const grants = `net.fetch ${API}`;
 let session: { token: string; editorUrl: string } | undefined;
+let startNativeService: (() => Promise<unknown>) | undefined;
 let revision = -1, lastQuery = '';
 let last: Result<'loadWorkspace'> = { root: '', activePath: '', activeName: 'No drawing open', scanning: false, scanCount: 0, error: '', entries: [], recent: [], editorUrl: '' };
 async function call(route: string, body?: unknown): Promise<any> {
   if (!session) {
-    const response = await fetch(`${API}/session`);
+    let response: Response;
+    try { response = await fetch(`${API}/session`); }
+    catch (error) {
+      if (!startNativeService) throw error;
+      await startNativeService();
+      response = await fetch(`${API}/session`);
+    }
     if (!response.ok) throw new Error('The local file service could not be reached.');
     session = await response.json();
     revision = -1;
@@ -39,7 +46,8 @@ const sources: Sources = {
       return { ok: false, error: (error as Error).message };
     }
   },
-  loadWorkspace: async ([query]) => {
+  loadWorkspace: async ([query], _store, _storage, native) => {
+    startNativeService = native?.available ? () => native.later({ op: 'start-service' }) : undefined;
     try {
       const result = await call(`/api/workspace?since=${query === lastQuery ? revision : -1}&query=${encodeURIComponent(query)}`);
       if (!result.unchanged) {
@@ -50,7 +58,7 @@ const sources: Sources = {
     } catch (error) {
       if ((error as { code?: string }).code === 'bake') throw error;
       session = undefined;
-      return { ...last, error: 'Start the local file service with bun run start, then try again.' };
+      return { ...last, error: native?.available ? `Could not connect to the file service: ${(error as Error).message}` : 'Start the local file service with bun run start, then try again.' };
     }
   },
   openLocation: ([path]) => action('/api/open', { path }),
