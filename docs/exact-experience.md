@@ -186,6 +186,16 @@ Verification: Command-B hid and restored the sidebar with the native search fiel
 
 Preserve this capability: one declaration connects the accessible control, keyboard command, and native menu even with a WebKit guest focused. Improve discoverability by including this embedded-editor case alongside the shortcut documentation and testing it as a framework regression case.
 
+## 018: the embedded editor can drive native shell appearance
+
+Status: verified in the installed macOS app and browser shell against exact2 `b0e24ded45`.
+
+The editor sends a small appearance string through `window.parent.postMessage`; the Contract iframe's `message` action validates the color and updates the sidebar and title-bar backgrounds. A root `color-scheme` declaration updates native text, inputs, icons, and selection colors independently of macOS appearance. No polling or companion endpoint was needed. The editor publishes only when its background, theme, or empty state changes.
+
+Excalidraw 0.18.1 applies `invert(93%) hue-rotate(180deg)` to its canvas in dark mode. Matching its raw `viewBackgroundColor` would leave a white shell beside a dark board. The appearance helper applies the same transform and selects readable shell controls from the resulting luminance. Browser screenshot comparisons cover white, dark, custom colors, filtered custom colors, empty state, and external file updates. Installed-app inspection confirmed matching backgrounds and readable native controls when switching both ways between light and dark.
+
+The first helper imported Excalidraw's `AppState` type from a `.ts` file. Exact captures `.ts` sources for its data-module check, and staging that package's transitive declarations exceeded its 64 MiB bound. Using the helper's actual two-field structural input removed the unnecessary dependency; the normal web and native builds then passed. This is a reproduced integration limit, not a TypeScript error in the app. A future framework improvement would stage only declarations reachable from the data module instead of unrelated editor utilities.
+
 ## Measured commands and qualification
 
 Exact's `.exact/commands.jsonl` records timestamps, revision, exit and elapsed milliseconds automatically. These are command durations, not total engineering time:

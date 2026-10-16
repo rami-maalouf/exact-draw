@@ -4,6 +4,7 @@ import { CaptureUpdateAction, Excalidraw, MainMenu, restore, serializeAsJSON } f
 import type { AppState, BinaryFiles, ExcalidrawImperativeAPI, LibraryItems } from '@excalidraw/excalidraw/types';
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/element/types';
 import './style.css';
+import { canvasAppearance } from './appearance';
 
 type Drawing = { type: 'excalidraw'; version: number; elements: ExcalidrawElement[]; appState: Partial<AppState>; files: BinaryFiles };
 type Snapshot = { path: string; version: string; document: Drawing };
@@ -32,6 +33,19 @@ function Editor() {
   const useDiskRef = useRef<() => Promise<void>>(async () => {});
   const changedRef = useRef<(elements: readonly ExcalidrawElement[], state: AppState, files: BinaryFiles) => void>(() => {});
   const dirtyRef = useRef(false);
+
+  useEffect(() => {
+    if (!api) return;
+    let previous = '';
+    const publish = (state: AppState) => {
+      const key = `${Boolean(path)}:${state.theme}:${state.viewBackgroundColor}`;
+      if (key === previous) return;
+      previous = key;
+      window.parent.postMessage(canvasAppearance(state, Boolean(path)), '*');
+    };
+    publish(api.getAppState());
+    return api.onChange((_elements, state) => publish(state));
+  }, [api, path]);
 
   useEffect(() => {
     if (!api) return;

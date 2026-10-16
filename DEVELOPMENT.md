@@ -92,6 +92,10 @@ The companion owns filesystem operations. The shell displays workspace state and
 
 Read Exact's `docs/start-here.md` in the adjacent checkout before changing Contract code. Use `bun exact.mjs contract vocab <name>` to look up supported attributes. Do not hand-edit generated files such as `app.contract.d.ts`, `exact.mjs`, `rust-toolchain.toml`, or `.cargo/config.toml`.
 
+## Canvas and shell appearance
+
+The embedded editor publishes its rendered background and a readable control color scheme through the iframe message channel. `editor/appearance.ts` accounts for Excalidraw's dark-mode canvas filter; `app.contract` applies the result to the sidebar and title bar. Keep these synchronized when upgrading Excalidraw: `bun run build:editor` followed by `bun tests/appearance.e2e.ts` checks the full browser shell against composited canvas pixels. Stop the installed app first because this test needs port 47931.
+
 ## Keyboard shortcuts
 
 Declare shell shortcuts on their action buttons in `app.contract` using Exact's `aria-keyshortcuts`. Use `-exact-menu` to place each command in the appropriate native menu, and include the shortcut in the button's tooltip. This keeps clicking, keyboard input, accessibility, and the macOS menu connected to the same action without a separate event handler or shortcut registry.
