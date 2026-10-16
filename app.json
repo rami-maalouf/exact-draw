@@ -1,0 +1,37 @@
+{
+  "$schema": "../exact2/scripts/app.schema.json",
+  "name": "Exact Draw",
+  "short_name": "Exact Draw",
+  "id": "com.example.exact-draw-ba51d7",
+  "start_url": "/",
+  "display": "standalone",
+  "app": {
+    "id": "com.example.exact-draw-ba51d7",
+    "name": "Exact Draw"
+  },
+  "host": {
+    "ios": {
+      "minimumOS": "17.0",
+      "deviceFamily": [
+        "iphone",
+        "ipad"
+      ]
+    },
+    "macos": {
+      "minimumOS": "14.0",
+      "window": {
+        "width": 900,
+        "height": 700
+      }
+    },
+    "web": {}
+  },
+  "deploy": {
+    "store": {
+      "web": "0",
+      "macos": "0",
+      "ios": "0",
+      "linux": "0"
+    }
+  }
+}
