@@ -29,7 +29,7 @@ Installed macOS app, captured October 16, 2026, with the canvas extending to the
 
 | Sidebar open | Sidebar hidden |
 | --- | --- |
-| ![Exact Draw with the sidebar open](docs/screenshots/sidebar-open.jpg) | ![Exact Draw with the sidebar hidden](docs/screenshots/sidebar-closed.jpg) |
+| ![Exact Draw with the sidebar open](docs/screenshots/sidebar-open.jpg) | ![Exact Draw with the sidebar hidden](docs/screenshots/canvas-full-window.jpg) |
 | Folder explorer, recent drawings, and the full-height canvas. | Full-width, full-height canvas with a floating sidebar toggle. |
 
 ## Current status
