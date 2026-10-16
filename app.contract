@@ -136,7 +136,7 @@ component ExactDraw
               image "assets/brand/logo.png" width=96 height=96 object-fit="contain" aria-hidden=true
               text "Connecting to your workspace" font-size=24 font-weight=600
               text "Start Exact Draw with bun run start." color="-exact-secondary-label"
-      column id="folder-menu" popover="auto" role="menu" aria-label="Folder actions"
+      column id="folder-menu" popover="auto" role="menu" aria-label="Folder actions" position="absolute"
         button press=removeFolder(menuFolder) popovertarget="folder-menu" popovertargetaction="hide" testId="remove-workspace-folder"
           text "Remove from workspace"
 
