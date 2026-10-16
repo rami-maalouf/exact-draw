@@ -16,3 +16,9 @@ The authoring diary: `bun exact.mjs feedback status` says whether this project k
 Generated, so don't edit: `exact.mjs`, `rust-toolchain.toml`, `.cargo/config.toml`,
 `Cargo.toml`'s `[patch.crates-io]` and this block.
 <!-- exact:end -->
+
+## Git workflow
+
+- Work directly on `main` and push there unless explicitly asked to use a branch or pull request.
+- Fetch and rebase onto `origin/main` before pushing when the remote has advanced.
+- Never create merge commits. If a pull request is requested, merge it using rebase.
