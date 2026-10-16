@@ -133,8 +133,9 @@ component ExactDraw
       row testId="window-header" position="absolute" top=0 left=0 height=32 max-width="100%" box-sizing="border-box" padding-left=(nativePicker.available ? 78 : 12) padding-right=12 gap=8 align-items="center" background-color="light-dark(#f7f7f9, #202024)" border-bottom-right-radius=8
         image "assets/brand/logo.png" width=20 height=20 object-fit="contain" aria-hidden=true flex-shrink=0
         text "Exact Draw" font-size=12 font-weight=600 flex-shrink=0
-        text "/" font-size=12 color="-exact-secondary-label" aria-hidden=true
-        text drawingName(workspace.activeName) min-width=0 max-width=280 white-space="nowrap" overflow="hidden" text-overflow="ellipsis" font-size=12 color="-exact-secondary-label" testId="active-name" title=workspace.activeName
+        if workspace.activePath != ""
+          text "/" font-size=12 color="-exact-secondary-label" aria-hidden=true
+          text drawingName(workspace.activeName) min-width=0 max-width=280 white-space="nowrap" overflow="hidden" text-overflow="ellipsis" font-size=12 color="-exact-secondary-label" testId="active-name" title=workspace.activeName
         button press=toggleSidebar aria-label=(sidebarOpen ? "Hide sidebar" : "Show sidebar") aria-keyshortcuts="Meta+b" -exact-menu="view" title=(sidebarOpen ? "Hide sidebar (⌘B)" : "Show sidebar (⌘B)") aria-expanded=sidebarOpen testId="toggle-sidebar" appearance="none" width=26 height=26 flex-shrink=0 display="flex" align-items="center" justify-content="center" border-radius=6 color="-exact-secondary-label"
           DrawIcon(name="sidebar", size=18)
       column id="folder-menu" popover="auto" role="menu" aria-label="Folder actions" position="absolute"
