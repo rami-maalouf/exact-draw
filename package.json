@@ -12,5 +12,12 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "typescript": "7.0.2"
+  },
+  "scripts": {
+    "start": "bun scripts/start.ts",
+    "start:web": "bun scripts/start.ts --web",
+    "build:editor": "bun scripts/build-editor.ts",
+    "check": "bun scripts/check.ts",
+    "test": "bun test service"
   }
 }

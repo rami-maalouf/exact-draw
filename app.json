@@ -20,8 +20,8 @@
     "macos": {
       "minimumOS": "14.0",
       "window": {
-        "width": 900,
-        "height": 700
+        "width": 1280,
+        "height": 820
       }
     },
     "web": {}

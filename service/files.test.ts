@@ -6,7 +6,7 @@ import { Documents } from './files';
 
 const directories: string[] = [];
 afterEach(async () => { for (const dir of directories.splice(0)) await rm(dir, { recursive: true, force: true }); });
-const scene = (name: string) => ({ type: 'excalidraw', version: 2, source: 'test', elements: [], appState: { name }, files: {}, custom: 'preserved' });
+const scene = (name: string) => ({ type: 'excalidraw' as const, version: 2, source: 'test', elements: [], appState: { name }, files: {}, custom: 'preserved' });
 async function fixture() {
   const dir = await mkdtemp(join(tmpdir(), 'exact-draw-'));
   directories.push(dir);

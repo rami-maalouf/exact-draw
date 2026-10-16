@@ -32,7 +32,8 @@ export class Documents {
       if (current.version !== version) throw new FileError('The file changed on disk. Your edits were not written over it.', 409);
       const merged = { ...current.document, ...Object.fromEntries(Object.entries(document).filter(([, value]) => value !== undefined)) };
       const bytes = JSON.stringify(merged, null, 2) + '\n';
-      if (digest(bytes) === version) return current;
+      const nextVersion = digest(bytes);
+      if (nextVersion === version) return current;
       const temp = `${current.path}.${randomUUID()}.tmp`;
       try {
         const info = await lstat(current.path);
@@ -41,7 +42,7 @@ export class Documents {
         await writeFile(join(this.recoveryDirectory, `${digest(current.path)}.previous.excalidraw`), JSON.stringify(current.document));
         if ((await this.read(current.path)).version !== version) throw new FileError('The file changed while saving. Your edits were not written over it.', 409);
         await rename(temp, current.path);
-        return { path: current.path, version: digest(bytes), document: merged };
+        return { path: current.path, version: nextVersion, document: merged };
       } finally { await rm(temp, { force: true }); }
     });
     this.queue = operation.catch(() => {});
