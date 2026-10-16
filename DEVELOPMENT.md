@@ -92,6 +92,12 @@ The companion owns filesystem operations. The shell displays workspace state and
 
 Read Exact's `docs/start-here.md` in the adjacent checkout before changing Contract code. Use `bun exact.mjs contract vocab <name>` to look up supported attributes. Do not hand-edit generated files such as `app.contract.d.ts`, `exact.mjs`, `rust-toolchain.toml`, or `.cargo/config.toml`.
 
+## Keyboard shortcuts
+
+Declare shell shortcuts on their action buttons in `app.contract` using Exact's `aria-keyshortcuts`. Use `-exact-menu` to place each command in the appropriate native menu, and include the shortcut in the button's tooltip. This keeps clicking, keyboard input, accessibility, and the macOS menu connected to the same action without a separate event handler or shortcut registry.
+
+The sidebar button declares `aria-keyshortcuts="Meta+b"` and `-exact-menu="view"`. Its label and tooltip follow the current visibility. New shortcuts should include a Contract interaction test and native verification with both the shell and embedded canvas focused.
+
 ## Checks and tests
 
 From the app directory, compile Contract first to refresh its generated TypeScript declarations, then run the basic checks:

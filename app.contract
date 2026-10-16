@@ -135,7 +135,7 @@ component ExactDraw
         text "Exact Draw" font-size=12 font-weight=600 flex-shrink=0
         text "/" font-size=12 color="-exact-secondary-label" aria-hidden=true
         text drawingName(workspace.activeName) min-width=0 max-width=280 white-space="nowrap" overflow="hidden" text-overflow="ellipsis" font-size=12 color="-exact-secondary-label" testId="active-name" title=workspace.activeName
-        button press=toggleSidebar aria-label=(sidebarOpen ? "Hide sidebar" : "Show sidebar") title=(sidebarOpen ? "Hide sidebar" : "Show sidebar") aria-expanded=sidebarOpen testId="toggle-sidebar" appearance="none" width=26 height=26 flex-shrink=0 display="flex" align-items="center" justify-content="center" border-radius=6 color="-exact-secondary-label"
+        button press=toggleSidebar aria-label=(sidebarOpen ? "Hide sidebar" : "Show sidebar") aria-keyshortcuts="Meta+b" -exact-menu="view" title=(sidebarOpen ? "Hide sidebar (⌘B)" : "Show sidebar (⌘B)") aria-expanded=sidebarOpen testId="toggle-sidebar" appearance="none" width=26 height=26 flex-shrink=0 display="flex" align-items="center" justify-content="center" border-radius=6 color="-exact-secondary-label"
           DrawIcon(name="sidebar", size=18)
       column id="folder-menu" popover="auto" role="menu" aria-label="Folder actions" position="absolute"
         button press=removeFolder(menuFolder) popovertarget="folder-menu" popovertargetaction="hide" testId="remove-workspace-folder"

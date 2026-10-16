@@ -19,3 +19,9 @@ test "the desktop shell connects to the file service"
   expect tree has "sidebar"
   expect tree missing "show-sidebar"
   expect tree missing "path"
+  type "toggle-sidebar" key "Meta+b"
+  expect state sidebarOpen == false
+  expect tree missing "sidebar"
+  type "toggle-sidebar" key "Meta+b"
+  expect state sidebarOpen == true
+  expect tree has "sidebar"

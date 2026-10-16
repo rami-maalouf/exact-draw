@@ -176,6 +176,16 @@ A cold-launch preview repeatedly displayed WebKit error -999 while a reload succ
 
 Framework opportunity: add a sandboxed loopback iframe cold-launch fixture that covers changing session URLs and asserts guest readiness. Document how to retain a guest across ordinary state updates while replacing it for a new authenticated session.
 
+## 017: declarative shortcuts reach the embedded canvas
+
+Status: verified in the installed macOS app on exact2 `b0e24ded45`.
+
+The sidebar toggle uses `aria-keyshortcuts="Meta+b"` and `-exact-menu="view"` on its existing action button. Exact supplies keyboard dispatch and the native View menu; the app supplies the changing Show/Hide label and shortcut tooltip. No separate keyboard listener, native module, or editor bridge was needed.
+
+Verification: Command-B hid and restored the sidebar with the native search field initially focused, then with the embedded drawing canvas focused. Canvas focus remained in the guest after both toggles. Clicking View > Hide sidebar invoked the same action. The Contract test also exercises both shortcut directions, and `exact verify` passed light/dark layouts at both configured sizes.
+
+Preserve this capability: one declaration connects the accessible control, keyboard command, and native menu even with a WebKit guest focused. Improve discoverability by including this embedded-editor case alongside the shortcut documentation and testing it as a framework regression case.
+
 ## Measured commands and qualification
 
 Exact's `.exact/commands.jsonl` records timestamps, revision, exit and elapsed milliseconds automatically. These are command durations, not total engineering time:

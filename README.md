@@ -18,7 +18,7 @@ The project also explores what it takes to build a practical desktop app with [E
 - **Browse only drawings.** The explorer shows `.excalidraw` files and their folder hierarchy. Discovery runs in the background, skips dependency/build directories and symlinks, and does not read unrelated file contents.
 - **Find and return to work.** Search drawing paths, expand folders, and reopen files from Recents. Drawing labels omit the extension to keep the list readable.
 - **See external edits.** The active drawing updates when another tool changes its file. Folder discovery leaves the current canvas open.
-- **Keep the canvas in focus.** Hide the sidebar completely and bring it back with the floating sidebar icon.
+- **Keep the canvas in focus.** Toggle the sidebar with **Command-B**, the title-bar sidebar button, or the **View** menu.
 - **Organize without moving files.** Right-click a workspace folder and choose **Remove from workspace**. Its files stay on disk, and an open drawing stays open.
 
 The intended editing model is taking turns, rather than simultaneous collaboration. If a save detects a newer disk version, it refuses the stale write and preserves conflicting local edits for recovery.
