@@ -35,6 +35,7 @@ component ExactDraw
   state query = ""
   state sidebarOpen = true
   state menuFolder = ""
+  state hoveredPath = ""
   resource nativePicker = pickerAvailable() as shape PickerSupport else empty()
   resource workspace = loadWorkspace(query) as shape Workspace else empty(activeName="No drawing open")
   mutation changed as shape Reply queue refreshes workspace
@@ -62,52 +63,67 @@ component ExactDraw
     send changed = removeWorkspaceFolder(value)
   action targetFolder(value: string)
     menuFolder = value
+  action hoverEntry(value: string, inside: bool)
+    hoveredPath = inside ? value : ""
   view
     main testId="app" width="100%" height="100%" display="flex" flex-direction="column" accent-color="-exact-system-indigo"
       row flex=1 min-height=0
         if sidebarOpen
-          column testId="sidebar" width=280 flex-shrink=0 padding=12 gap=12 background-color="-exact-secondary-background"
-            row gap=8 align-items="center"
-              button press=toggleSidebar aria-label="Hide sidebar" aria-expanded=sidebarOpen testId="toggle-sidebar" width=28 height=28
-                text "‹"
-              text workspace.activeName flex=1 min-width=0 text-overflow="ellipsis" font="-exact-footnote" color="-exact-secondary-label" testId="active-name"
-            text "WORKSPACE" font="-exact-caption1" color="-exact-secondary-label"
+          column testId="sidebar" width=288 flex-shrink=0 padding=12 gap=10 background-color="light-dark(#f7f7f9, #202024)" border-right="1px solid light-dark(#e6e6eb, #323238)" font-size=13
+            row gap=8 align-items="center" padding="2px 4px 4px 6px"
+              column flex=1 min-width=0 gap=4
+                text "Drawings" font-size=16 font-weight=600 letter-spacing=-0.3
+                text workspace.activeName min-width=0 text-overflow="ellipsis" font-size=11 color="-exact-secondary-label" testId="active-name"
+              button press=toggleSidebar aria-label="Hide sidebar" title="Hide sidebar" aria-expanded=sidebarOpen testId="toggle-sidebar" appearance="none" width=30 height=30 display="flex" align-items="center" justify-content="center" border-radius=6 color="-exact-secondary-label"
+                DrawIcon(name="sidebar", size=18)
             if nativePicker.available
-              button press=browse("file") disabled=pending(changed) buttonStyle="bordered" testId="open-drawing"
-                text "Open drawing…"
-              button press=browse("folder") disabled=pending(changed) buttonStyle="bordered" testId="open-folder"
-                text "Open folder…"
+              row gap=6
+                button press=browse("file") disabled=pending(changed) appearance="none" testId="open-drawing" aria-label="Open drawing" flex=1 padding="8px 10px" border-radius=7 background-color="light-dark(#ffffff, #2b2b30)" border="1px solid light-dark(#dedee5, #3b3b43)" text-align="start"
+                  row gap=7 align-items="center"
+                    DrawIcon(name="file", size=15)
+                    text "Open drawing" font-size=12 font-weight=500
+                button press=browse("folder") disabled=pending(changed) appearance="none" testId="open-folder" aria-label="Add folder" flex=1 padding="8px 10px" border-radius=7 background-color="light-dark(#ffffff, #2b2b30)" border="1px solid light-dark(#dedee5, #3b3b43)" text-align="start"
+                  row gap=7 align-items="center"
+                    DrawIcon(name="folder", size=15)
+                    text "Add folder" font-size=12 font-weight=500
             if actionError != ""
               text actionError color="-exact-system-red" font="-exact-footnote" testId="action-error" overflow-wrap="anywhere"
             if workspace.error != ""
               text workspace.error color="-exact-system-red" font="-exact-footnote" testId="workspace-error" overflow-wrap="anywhere"
             if workspace.root != ""
-              row gap=8 align-items="center"
-                text "EXPLORER" font="-exact-caption1" color="-exact-secondary-label" flex=1
-                button press=rescan disabled=workspace.scanning aria-label="Refresh folder" testId="refresh-folder"
-                  text "Refresh"
-              input value=query input=search placeholder="Find a drawing" aria-label="Find a drawing" testId="search" min-width=0
-              text (workspace.scanning ? `Discovering… ${workspace.scanCount} ${workspace.scanCount == 1 ? "drawing" : "drawings"}` : `${workspace.scanCount} ${workspace.scanCount == 1 ? "drawing" : "drawings"}`) font="-exact-footnote" color="-exact-secondary-label" testId="scan-status"
-              list virtualized=true flex=1 min-height=0 testId="explorer"
+              input value=query input=search placeholder="Find a drawing…" aria-label="Find a drawing" testId="search" min-width=0 font-size=12
+              row gap=8 align-items="center" padding="2px 4px 0px 6px"
+                text "Folders" font-size=11 font-weight=600 color="-exact-secondary-label" flex=1
+                button press=rescan disabled=workspace.scanning aria-label="Refresh folders" title="Refresh folders" testId="refresh-folder" appearance="none" width=24 height=24 display="flex" align-items="center" justify-content="center" color="-exact-secondary-label"
+                  DrawIcon(name="refresh", size=14)
+              list appearance="none" virtualized=true flex=1 min-height=0 testId="explorer"
                 for entry in workspace.entries key=entry.id
-                  row min-height=32 padding-left=(entry.depth * 14)
-                    button press=activate(entry.path, entry.directory) contextmenu=targetFolder(entry.path) contextPopover=(entry.workspaceFolder ? "folder-menu" : "") appearance="none" aria-label=entry.path testId=`entry-${entry.id}` flex=1 min-width=0
-                      row gap=6 align-items="center"
-                        text (entry.directory ? (entry.expanded ? "▾" : "▸") : "◇") color="-exact-secondary-label"
-                        text entry.name text-overflow="ellipsis" min-width=0 flex=1
+                  row min-height=30 padding-left=(entry.depth * 12)
+                    button press=activate(entry.path, entry.directory) hover=hoverEntry(entry.path) contextmenu=targetFolder(entry.path) contextPopover=(entry.workspaceFolder ? "folder-menu" : "") appearance="none" aria-label=entry.path title=entry.name testId=`entry-${entry.id}` flex=1 min-width=0 padding="6px 7px" border-radius=6 text-align="start" background-color=(entry.path == workspace.activePath ? "light-dark(#e8e5fc, #3a354f)" : (hoveredPath == entry.path ? "light-dark(#eeeef2, #2c2c32)" : "transparent"))
+                      row gap=6 align-items="center" min-width=0
+                        if entry.directory
+                          DrawIcon(name=(entry.expanded ? "down" : "right"), size=10)
+                        else
+                          column width=10 flex-shrink=0
+                        row color=(entry.path == workspace.activePath ? "light-dark(#6455b5, #bfb4f7)" : "-exact-secondary-label")
+                          DrawIcon(name=(entry.directory ? "folder" : "file"), size=15)
+                        text entry.name font-size=12 font-weight=(entry.workspaceFolder ? 600 : 400) text-overflow="ellipsis" min-width=0 flex=1
+              text (workspace.scanning ? `Discovering… ${workspace.scanCount} ${workspace.scanCount == 1 ? "drawing" : "drawings"}` : `${workspace.scanCount} ${workspace.scanCount == 1 ? "drawing" : "drawings"}`) font-size=11 color="-exact-secondary-label" padding-left=6 testId="scan-status"
             else
-              column flex=1 justify-content="center" gap=8 padding="20px 4px"
-                text "Your drawings,\nwhere they belong." font-size=22 font-weight=600
-                text "Open a file to draw, or a folder to explore. Only .excalidraw files appear here." color="-exact-secondary-label" overflow-wrap="anywhere"
+              column flex=1 justify-content="center" gap=8 padding="20px 6px"
+                text "A place for\nyour ideas." font-size=22 font-weight=600 letter-spacing=-0.5
+                text "Open a drawing or add a folder to get started." font-size=13 color="-exact-secondary-label" overflow-wrap="anywhere"
             if workspace.recent.length > 0
-              text "RECENT LOCATIONS" font="-exact-caption1" color="-exact-secondary-label"
-              list virtualized=true height=170 min-height=80 testId="recent"
-                for item in workspace.recent key=item.path
-                  row min-height=38
-                    button press=openRecent(item.path) appearance="none" aria-label=item.path testId=`recent-${item.id}` flex=1 min-width=0
-                      column gap=2
-                        text item.name text-overflow="ellipsis"
-                        text item.kind color="-exact-secondary-label" font="-exact-caption1"
+              column gap=6 padding-top=10 border-top="1px solid light-dark(#e6e6eb, #323238)"
+                text "Recent" font-size=11 font-weight=600 color="-exact-secondary-label" padding-left=6
+                list appearance="none" virtualized=true height=146 min-height=60 testId="recent"
+                  for item in workspace.recent key=item.path
+                    row min-height=28
+                      button press=openRecent(item.path) hover=hoverEntry(item.path) appearance="none" aria-label=item.path title=item.path testId=`recent-${item.id}` flex=1 min-width=0 padding="6px 7px" border-radius=6 text-align="start" background-color=(hoveredPath == item.path ? "light-dark(#eeeef2, #2c2c32)" : "transparent")
+                        row gap=8 align-items="center" min-width=0
+                          row color="-exact-secondary-label"
+                            DrawIcon(name=(item.kind == "folder" ? "folder" : "file"), size=14)
+                          text item.name font-size=12 text-overflow="ellipsis" min-width=0 flex=1
         column id="canvas-host" testId="canvas-host" flex=1 min-width=0 min-height=0 position="relative"
           if workspace.editorUrl != ""
             iframe src=workspace.editorUrl sandbox="allow-scripts allow-same-origin allow-downloads" flex=1 min-height=0 testId="drawing-editor"
@@ -116,8 +132,28 @@ component ExactDraw
               text "Connecting to your workspace" font-size=24 font-weight=600
               text "Start Exact Draw with bun run start." color="-exact-secondary-label"
           if not sidebarOpen
-            button press=toggleSidebar aria-label="Show sidebar" aria-expanded=false testId="show-sidebar" position="absolute" left=64 top=16 width=82 height=36 z-index=10 background-color="-exact-background" color="-exact-label" border-radius=8 box-shadow="0 2px 8px rgba(0, 0, 0, 0.12)"
-              text "Sidebar"
+            button press=toggleSidebar aria-label="Show sidebar" title="Show sidebar" aria-expanded=false testId="show-sidebar" position="absolute" left=64 top=16 width=36 height=36 display="flex" align-items="center" justify-content="center" z-index=10 background-color="-exact-background" color="-exact-label" border-radius=8 box-shadow="0 2px 8px rgba(0, 0, 0, 0.12)"
+              DrawIcon(name="sidebar", size=20)
       column id="folder-menu" popover="auto" role="menu" aria-label="Folder actions"
         button press=removeFolder(menuFolder) popovertarget="folder-menu" popovertargetaction="hide" testId="remove-workspace-folder"
           text "Remove from workspace"
+
+component DrawIcon
+  props
+    name: string
+    size: number
+  view
+    svg width=size height=size viewBox="0 0 24 24" fill="none" stroke="currentcolor" stroke-width=1.6 stroke-linecap="round" stroke-linejoin="round" flex-shrink=0 aria-hidden=true
+      if name == "sidebar"
+        rect x=3 y=4 width=18 height=16 rx=2.5
+        path d="M9 4v16"
+      if name == "folder"
+        path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10H3Z"
+      if name == "file"
+        path d="M6 3h8l4 4v14H6Z M14 3v5h4 M9 12h6 M9 16h6"
+      if name == "refresh"
+        path d="M20 7v5h-5 M20 12a8 8 0 1 0-2 5"
+      if name == "down"
+        path d="m6 9 6 6 6-6"
+      if name == "right"
+        path d="m9 6 6 6-6 6"

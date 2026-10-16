@@ -102,6 +102,16 @@ Status: verified in the native app and covered by the web Contract test.
 
 The sidebar is conditionally removed from layout instead of shrinking to a narrow rail. The editor stays in the same canvas container, and an absolutely positioned Sidebar button restores the explorer. Native interaction confirmed that the embedded frame stays mounted across both transitions and that the button renders above the web view. No native extension or framework workaround was needed. The existing web verification passed with these sidebar changes, including the hide and reopen assertions.
 
+## 011: a compact explorer and portable sidebar icon
+
+Status: implemented and visually checked on macOS; web light/dark verification passed.
+
+The original explorer inherited centered button content and plain-list separators. Explicit `text-align="start"` and `list appearance="none"` let the app draw compact explorer rows while retaining virtualization. The redesigned sidebar uses smaller controls, a single-line recent list, hover feedback, and an active-document highlight. The floating reopen button now contains an icon and retains its accessible label.
+
+Exact's documented portable symbol roles do not include a sidebar or folder icon; arbitrary SF Symbols would be blank on the web. A small shared Contract SVG component supplies consistent outline icons on both hosts without a native module. Native screenshot inspection confirmed these icons and the overlay above the embedded editor. This is a portable icon catalog gap, not a rendering failure.
+
+Validation: eight service tests with 42 assertions, TypeScript and Contract checks, file/folder/context-menu shell tests on web and macOS, and web verification at two sizes in both color schemes with no findings. The user's existing drawing was reopened, and the native expanded and collapsed layouts were inspected.
+
 ## Measured commands and qualification
 
 Exact's `.exact/commands.jsonl` records timestamps, revision, exit and elapsed milliseconds automatically. These are command durations, not total engineering time:
