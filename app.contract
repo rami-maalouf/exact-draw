@@ -25,10 +25,14 @@ shape Reply
   ok: bool
   error: string
 
+shape PickerSupport
+  available: bool
+
 component ExactDraw
   state path = ""
   state query = ""
   state sidebarOpen = true
+  resource nativePicker = pickerAvailable() as shape PickerSupport else empty()
   resource workspace = loadWorkspace(query) as shape Workspace else empty(activeName="No drawing open")
   mutation changed as shape Reply queue refreshes workspace
   derive actionError = match changed { case some(r) => r.error, case none => "" }
@@ -45,6 +49,8 @@ component ExactDraw
   action openPath
     if path.trim() != ""
       send changed = openLocation(path.trim())
+  action browse(kind: string)
+    send changed = chooseLocation(kind)
   action openRecent(value: string)
     send changed = openLocation(value)
   action activate(value: string, directory: bool)
@@ -65,6 +71,11 @@ component ExactDraw
               text workspace.activeName flex=1 min-width=0 text-overflow="ellipsis" font="-exact-footnote" color="-exact-secondary-label" testId="active-name"
           if sidebarOpen
             text "WORKSPACE" font="-exact-caption1" color="-exact-secondary-label"
+            if nativePicker.available
+              button press=browse("file") disabled=pending(changed) buttonStyle="bordered" testId="open-drawing"
+                text "Open drawing…"
+              button press=browse("folder") disabled=pending(changed) buttonStyle="bordered" testId="open-folder"
+                text "Open folder…"
             input value=path input=editPath submit=openPath placeholder="File or folder path" aria-label="File or folder path" testId="path" min-width=0
             button press=openPath disabled=(path.trim() == "") buttonStyle="bordered" testId="open"
               text "Open path"

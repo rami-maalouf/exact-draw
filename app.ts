@@ -26,6 +26,19 @@ async function action(route: string, body: unknown) {
   catch (error) { if ((error as { code?: string }).code === 'bake') throw error; return { ok: false, error: (error as Error).message }; }
 }
 const sources: Sources = {
+  pickerAvailable: (_args, _store, _storage, native) => ({ available: native?.available === true }),
+  chooseLocation: async ([kind], _store, _storage, native) => {
+    try {
+      if (!native?.available) return { ok: false, error: 'Use the path field to open a location on this platform.' };
+      const selected = await native.later({ op: 'choose', kind });
+      if (selected.cancelled === true) return { ok: true, error: '' };
+      if (typeof selected.path !== 'string' || !selected.path) throw new Error('The chooser did not return a path.');
+      return await action('/api/open', { path: selected.path });
+    } catch (error) {
+      if ((error as { code?: string }).code === 'bake') throw error;
+      return { ok: false, error: (error as Error).message };
+    }
+  },
   loadWorkspace: async ([query]) => {
     try {
       const result = await call(`/api/workspace?since=${query === lastQuery ? revision : -1}&query=${encodeURIComponent(query)}`);

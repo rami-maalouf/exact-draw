@@ -64,6 +64,18 @@ The computer-use coordinate drag API repeatedly returned `noWindowsAvailable`, i
 
 Remaining product work: bundle/start the file companion with the native application so Finder launch is sufficient. Do not confuse an assembled `.app` with a complete distributable product.
 
+## 007: native pickers exist, but document handles are not companion paths
+
+Status: source-confirmed integration boundary; native selection verified.
+
+The initial UI had only a path field. Exact provides `showOpenFilePicker` and `showDirectoryPicker`, implemented with native panels, but returns session-local `doc:/` handles. Its documented document API refuses `realpath`; these handles cannot be passed directly to a separate Bun process or persisted as recent filesystem paths.
+
+The app now uses Exact's supported `native.later` interface and a small macOS Swift module to show `NSOpenPanel` and return the selected path. File selection filters and validates `.excalidraw`; folder selection calls the existing worker discovery. Cancel returns without opening anything. This is specific to the current unsandboxed development architecture and does not establish cross-process sandbox access.
+
+Verified in the real native UI: open a drawing through the chooser, open its folder while keeping the canvas, cancel without changing the current drawing. The module built through the normal Exact build. One Swift compile correction was needed: the panel delegate must inherit NSObject, so it is a separate helper rather than the ExactModule subclass. That was app integration work, not an Exact defect.
+
+Framework opportunity: a documented way to hand a user-selected document to an app-owned background service, including persistent access and sandbox scope, would make this architecture easier to support.
+
 ## Measured commands and qualification
 
 Exact's `.exact/commands.jsonl` records timestamps, revision, exit and elapsed milliseconds automatically. These are command durations, not total engineering time:

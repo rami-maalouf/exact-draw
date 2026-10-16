@@ -14,7 +14,7 @@ bun run start
 
 The launcher builds local editor assets and the native `.app`, starts the loopback file service, and opens the window. Keep the launcher running. Closing the app stops the service. The `.app` alone is not yet self-contained: automatic companion startup from Finder remains packaging work.
 
-Paste an absolute file or folder path into **File or folder path** and select **Open path**. `~/` is supported. Try `examples/Welcome.excalidraw` using its absolute path. Recent locations remain available after restarting the service and app.
+On macOS, use **Open drawing…** or **Open folder…** to choose a location with the native system dialog. The drawing chooser accepts only `.excalidraw`; cancelling leaves the current drawing alone. You can also paste a path into **File or folder path** and select **Open path** (`~/` is supported). The web build uses this path field. Try `examples/Welcome.excalidraw`. Recent locations remain available after restarting the service and app.
 
 - Only ordinary `.excalidraw` files are supported. `.excalidraw.md` is excluded.
 - The explorer scans directory entries in a worker, progressively, without reading drawing contents. It skips dependency/build directories and symlinks. Expand folders or search paths to find drawings.
@@ -43,6 +43,7 @@ Tests cover browser drawing gestures and disk writes, external atomic replacemen
 
 - `app.contract`: native explorer and recent locations.
 - `app.ts`: Exact data sources talking to the local companion.
+- `macos/modules/FileChooser.swift`: native system file/folder selection through Exact's asynchronous module API.
 - `editor/`: official React editor and autosave/refresh coordination.
 - `service/`: filesystem ownership, history, active-file watching, worker discovery and authenticated loopback API.
 - [Build plan](docs/build-plan.md), [Exact experience journal](docs/exact-experience.md).
