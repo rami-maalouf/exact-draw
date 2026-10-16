@@ -6,8 +6,6 @@ button { font: inherit; }
 .editor-shell { display: flex; flex-direction: column; height: 100%; }
 .canvas-region { min-height: 0; flex: 1; position: relative; }
 .canvas-region > .excalidraw { height: 100%; }
-/* reserve space for macos window buttons only above the menu, leaving the canvas full size. */
-.native-window .excalidraw .App-menu_top > :first-child { margin-top: 32px; }
 .canvas-empty > .excalidraw, .canvas-empty > .excalidraw * { visibility: hidden !important; }
 .empty-state { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; text-align: center; background: radial-gradient(#dce1d6 .7px, transparent .7px); background-size: 22px 22px; padding: 28px; }
 .eyebrow { letter-spacing: 2px; font-size: 10px; font-weight: 600; color: #77886c; }
