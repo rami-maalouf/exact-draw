@@ -20,7 +20,7 @@ On macOS, use **Open drawing…** or **Open folder…** to choose a location wit
 - The explorer scans directory entries in a worker, progressively, without reading drawing contents. It skips dependency/build directories and symlinks. Expand folders or search paths to find drawings.
 - Folder discovery leaves the current drawing open. Use **Refresh** to rediscover newly added files; active-document changes refresh automatically.
 - Every added folder stays in the workspace across app/service restarts, including empty or temporarily unavailable folders. Opening another folder adds it alongside the others. Expanded folders are remembered, and discovery resumes in the background on launch.
-- **Remove** beside a workspace folder removes only that explorer root. It does not delete or move files, and an open drawing stays open. Previously selected folders are migrated from recent history the first time this version starts.
+- Right-click a workspace folder and choose **Remove from workspace** to remove that explorer root. It does not delete or move files, and an open drawing stays open. Previously selected folders are migrated from recent history the first time this version starts.
 - Edits autosave after a short debounce. The canvas preserves zoom and position on external refresh.
 - A stale save is refused. Conflicting local edits are preserved in a recovery file before choosing **Use disk version**.
 - Pending edits also have a browser-local draft to survive a quick reload. Large embedded images can exceed browser storage quota; a warning tells you to keep the window open until Saved.

@@ -6,12 +6,15 @@ import { startService } from '../service/server';
 const root = await realpath(await mkdtemp(join(tmpdir(), 'draw-shell-')));
 const app = resolve(import.meta.dir, '..');
 const file = join(root, 'First.excalidraw');
+const otherFolder = join(root, 'Other');
+await mkdir(otherFolder);
 await writeFile(file, JSON.stringify({ type: 'excalidraw', version: 2, elements: [], appState: {}, files: {} }));
 await writeFile(join(root, 'hidden.excalidraw.md'), 'not a supported drawing');
 const options = { port: 47931, stateDirectory: join(root, 'state'), testLoopbackOrigins: true };
 let service = await startService(options);
 await service.open(file);
 await service.open(root);
+await service.open(otherFolder);
 service.stop();
 service = await startService(options);
 const testPath = join(app, '.exact/shell.test.contract');
@@ -37,9 +40,12 @@ await writeFile(testPath, `test "restore the saved folder and open its drawing w
   clock data
   expect tree has ${JSON.stringify(`entry-${encodeURIComponent(root)}--${encodeURIComponent(file)}`)}
   expect text "scan-status" == "1 drawing"
-  tap ${JSON.stringify(`remove-${encodeURIComponent(root)}`)}
+  tap ${JSON.stringify(`entry-${encodeURIComponent(root)}`)} contextmenu
+  expect tree has "remove-workspace-folder"
+  tap "remove-workspace-folder"
   clock data
   expect tree missing ${JSON.stringify(`entry-${encodeURIComponent(root)}`)}
+  expect tree has ${JSON.stringify(`entry-${encodeURIComponent(otherFolder)}`)}
   expect text "active-name" == "First.excalidraw"
 `);
 try {

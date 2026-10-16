@@ -88,6 +88,14 @@ The revised shell test exposed an Exact agent targeting issue: a raw path in a t
 
 Validation: eight filesystem/service tests (42 assertions), TypeScript and Contract checks, restored-workspace shell tests on web and macOS, and `exact verify` on web with no findings in 5.6 seconds. A real macOS relaunch restored the previously selected folders without input and showed no path field; the previously open drawing was reopened through recent history.
 
+## 009: folder context menus use the built-in native menu
+
+Status: implemented and tested on web and macOS.
+
+Workspace roots now use `contextPopover` with a shared menu. The row's `contextmenu` action sets the target folder before the menu opens, and the menu button removes workspace membership. Non-root rows have no folder menu. This needed no Swift code: Exact maps the same Contract declaration to a macOS menu and a web popover.
+
+The shell E2E right-clicks a root and chooses Remove from workspace, then verifies that another root and the current drawing remain. The first native test returned a stale-build error instead of rebuilding automatically, despite `exact.mjs help mac` saying it would rebuild. Running `bun exact.mjs mac --bundle` explicitly resolved it, and both hosts passed.
+
 ## Measured commands and qualification
 
 Exact's `.exact/commands.jsonl` records timestamps, revision, exit and elapsed milliseconds automatically. These are command durations, not total engineering time:
