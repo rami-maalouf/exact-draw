@@ -192,7 +192,7 @@ function Editor() {
     return () => { disposed = true; clearTimeout(timer); clearTimeout(eventTimer); events.close(); window.removeEventListener('focus', wake); document.removeEventListener('visibilitychange', wake); window.removeEventListener('beforeunload', beforeUnload); };
   }, [api]);
 
-  return <main className="editor-shell">
+  return <main className={`editor-shell${parameters.get('titlebar') === 'overlay' ? ' editor-shell-overlay' : ''}${notice ? ' editor-shell-notice' : ''}`}>
     <span className="visually-hidden" data-testid="active-path">{path}</span>
     <div className="visually-hidden" role="status" aria-live="polite" data-testid="save-status">{status}</div>
     {notice && <div className={`notice ${conflict ? 'notice-conflict' : ''}`} role="alert"><span>{notice}</span>{conflict ? <button onClick={() => void useDiskRef.current()}>Use disk version</button> : <button onClick={() => void saveRef.current().catch(error => setNotice(error.message))}>Retry</button>}</div>}

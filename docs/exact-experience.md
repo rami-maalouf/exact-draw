@@ -166,6 +166,16 @@ The project-owned section of `AGENTS.md` now directs agents to read and maintain
 
 Framework opportunity: let projects register a tracked experience journal and have `feedback status` identify it alongside submission diaries. The two serve different audiences, but their relationship should be explicit so useful findings are not lost or duplicated.
 
+## Canvas beneath title-bar controls (2026-10-16)
+
+Status: verified on macOS against exact2 `b0e24ded45`; browser layout checks also pass.
+
+The title and sidebar toggle now occupy an opaque, absolutely positioned header sized to its contents. The canvas fills its pane to the top and bottom; only the guest controls reserve the header's 32 px height. Excalidraw's desktop UI layer, mobile top bar, Library panel, and warning messages need separate treatment. The isolated browser test checks viewport coverage and control clearance at 1200, 760, and 390 px widths, plus Library and a real invalid-file warning. Native inspection confirmed the installed app's canvas behind the unused title-bar area and working sidebar toggle.
+
+A cold-launch preview repeatedly displayed WebKit error -999 while a reload succeeded. Moving URL construction into the data module and changing overlay stacking did not resolve it. Keying the iframe by its editor-session URL did: subsequent preview and installed-app cold launches loaded the guest without a reload. A session/source replacement race is a hypothesis, not a source-confirmed framework diagnosis. Normal workspace refreshes keep the same URL and frame. A temporary comparison with the previous web runtime did not produce a working editor and was discarded; the installed build uses the normal packaged runtime.
+
+Framework opportunity: add a sandboxed loopback iframe cold-launch fixture that covers changing session URLs and asserts guest readiness. Document how to retain a guest across ordinary state updates while replacing it for a new authenticated session.
+
 ## Measured commands and qualification
 
 Exact's `.exact/commands.jsonl` records timestamps, revision, exit and elapsed milliseconds automatically. These are command durations, not total engineering time:

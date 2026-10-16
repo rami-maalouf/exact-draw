@@ -52,7 +52,7 @@ const sources: Sources = {
       const result = await call(`/api/workspace?since=${query === lastQuery ? revision : -1}&query=${encodeURIComponent(query)}`);
       if (!result.unchanged) {
         revision = result.revision; lastQuery = query;
-        last = { root: result.root, activePath: result.activePath, activeName: result.activeName, scanning: result.scanning, scanCount: result.scanCount, error: result.error, entries: result.entries, recent: result.recent, editorUrl: session!.editorUrl };
+        last = { root: result.root, activePath: result.activePath, activeName: result.activeName, scanning: result.scanning, scanCount: result.scanCount, error: result.error, entries: result.entries, recent: result.recent, editorUrl: `${session!.editorUrl}&titlebar=overlay` };
       }
       return last;
     } catch (error) {
