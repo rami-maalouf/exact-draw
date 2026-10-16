@@ -8,9 +8,6 @@ button { font: inherit; }
 .canvas-region > .excalidraw { height: 100%; }
 .canvas-empty > .excalidraw, .canvas-empty > .excalidraw * { visibility: hidden !important; }
 .empty-state { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; text-align: center; background: radial-gradient(#dce1d6 .7px, transparent .7px); background-size: 22px 22px; padding: 28px; }
-.paper-mark { width: 65px; height: 78px; padding: 22px 13px; border: 1px solid #acb7a3; border-radius: 5px; background: #fffefa; box-shadow: 7px 7px 0 #e9eee3; transform: rotate(-5deg); margin-bottom: 25px; }
-.paper-mark span { display: block; height: 2px; background: #a4b39a; margin: 6px 0; }
-.paper-mark span:last-child { width: 65%; }
 .eyebrow { letter-spacing: 2px; font-size: 10px; font-weight: 600; color: #77886c; }
 h1 { font-family: Georgia, serif; font-size: clamp(25px, 3.5vw, 38px); font-weight: 400; letter-spacing: -.8px; margin: 10px 0 14px; color: #35442e; }
 .empty-state > p:not(.eyebrow) { line-height: 1.8; font-size: 13px; color: #747e6d; margin: 0; max-width: 460px; }
@@ -26,3 +23,5 @@ h1 { font-family: Georgia, serif; font-size: clamp(25px, 3.5vw, 38px); font-weig
 @media (max-width: 620px) { .empty-details { flex-direction: column; gap: 10px; } }
 
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+.brand-mark { width: 128px; height: 128px; object-fit: contain; margin-bottom: 16px; }

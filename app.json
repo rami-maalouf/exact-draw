@@ -5,6 +5,13 @@
   "id": "com.example.exact-draw-ba51d7",
   "start_url": "/",
   "display": "standalone",
+  "icons": [
+    { "src": "assets/brand/app-icon.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any" }
+  ],
+  "brand": {
+    "logo": "assets/brand/logo.png",
+    "wordmark": { "text": "Exact Draw" }
+  },
   "app": {
     "id": "com.example.exact-draw-ba51d7",
     "name": "Exact Draw"

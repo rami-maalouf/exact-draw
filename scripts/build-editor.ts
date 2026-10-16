@@ -20,6 +20,8 @@ const result = await Bun.build({
 if (!result.success) { for (const log of result.logs) console.error(log); process.exit(1); }
 await cp(join(root, 'node_modules/@excalidraw/excalidraw/dist/prod/fonts'), join(outdir, 'fonts'), { recursive: true });
 await cp(join(root, 'node_modules/@excalidraw/excalidraw/dist/prod/index.css'), join(outdir, 'excalidraw.css'));
+await cp(join(root, 'assets/brand/logo.png'), join(outdir, 'logo.png'));
+await cp(join(root, 'assets/brand/favicon.png'), join(outdir, 'favicon.png'));
 await Bun.write(join(outdir, 'index.html'), `<!doctype html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Exact Draw</title><link rel="stylesheet" href="/assets/excalidraw.css"><link rel="stylesheet" href="/assets/main.css"><script>window.EXCALIDRAW_ASSET_PATH = '/assets/';</script></head><body><div id="root"></div><script type="module" src="/assets/main.js"></script></body></html>`);
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Exact Draw</title><link rel="icon" type="image/png" href="/assets/favicon.png"><link rel="stylesheet" href="/assets/excalidraw.css"><link rel="stylesheet" href="/assets/main.css"><script>window.EXCALIDRAW_ASSET_PATH = '/assets/';</script></head><body><div id="root"></div><script type="module" src="/assets/main.js"></script></body></html>`);
 console.log('Built the local Excalidraw editor and bundled fonts.');

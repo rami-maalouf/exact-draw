@@ -74,8 +74,9 @@ component ExactDraw
         if sidebarOpen
           column testId="sidebar" width=288 flex-shrink=0 padding=12 gap=10 background-color="light-dark(#f7f7f9, #202024)" border-right="1px solid light-dark(#e6e6eb, #323238)" font-size=13
             row gap=8 align-items="center" padding="2px 4px 4px 6px"
+              image "assets/brand/logo.png" width=32 height=32 object-fit="contain" aria-hidden=true flex-shrink=0
               column flex=1 min-width=0 gap=4
-                text "Drawings" font-size=16 font-weight=600 letter-spacing=-0.3
+                text "Exact Draw" font-size=16 font-weight=600 letter-spacing=-0.3
                 text drawingName(workspace.activeName) min-width=0 text-overflow="ellipsis" font-size=11 color="-exact-secondary-label" testId="active-name"
               button press=toggleSidebar aria-label="Hide sidebar" title="Hide sidebar" aria-expanded=sidebarOpen testId="toggle-sidebar" appearance="none" width=30 height=30 display="flex" align-items="center" justify-content="center" border-radius=6 color="-exact-secondary-label"
                 DrawIcon(name="sidebar", size=18)
@@ -132,6 +133,7 @@ component ExactDraw
             iframe src=workspace.editorUrl sandbox="allow-scripts allow-same-origin allow-downloads" flex=1 min-height=0 testId="drawing-editor"
           else
             column flex=1 align-items="center" justify-content="center" padding=24 gap=12
+              image "assets/brand/logo.png" width=96 height=96 object-fit="contain" aria-hidden=true
               text "Connecting to your workspace" font-size=24 font-weight=600
               text "Start Exact Draw with bun run start." color="-exact-secondary-label"
           if not sidebarOpen

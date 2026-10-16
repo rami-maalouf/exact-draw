@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/brand/logo.png" alt="Exact Draw logo" width="160" /></p>
+
 # Exact Draw
 
 A local macOS editor for `.excalidraw` files. Exact renders the desktop shell and explorer; the official Excalidraw component renders the canvas in Exact's WebKit surface.
