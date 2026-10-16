@@ -9,6 +9,7 @@ const file = join(root, 'First.excalidraw');
 const otherFolder = join(root, 'Other');
 await mkdir(otherFolder);
 await writeFile(file, JSON.stringify({ type: 'excalidraw', version: 2, elements: [], appState: {}, files: {} }));
+await writeFile(join(root, 'Unopened.excalidraw'), JSON.stringify({ type: 'excalidraw', version: 2, elements: [], appState: {}, files: {} }));
 await writeFile(join(root, 'hidden.excalidraw.md'), 'not a supported drawing');
 const options = { port: 47931, stateDirectory: join(root, 'state'), testLoopbackOrigins: true };
 let service = await startService(options);
@@ -26,6 +27,7 @@ await writeFile(testPath, `test "restore the saved folder and open its drawing w
   expect tree missing "open"
   expect tree missing ${JSON.stringify(`recent-${encodeURIComponent(root)}`)}
   expect tree missing ${JSON.stringify(`recent-${encodeURIComponent(otherFolder)}`)}
+  expect text "recent-heading" == "Recent (1)"
   expect tree has ${JSON.stringify(`entry-${encodeURIComponent(root)}`)}
   tap ${JSON.stringify(`recent-${encodeURIComponent(file)}`)}
   clock data
@@ -41,7 +43,8 @@ await writeFile(testPath, `test "restore the saved folder and open its drawing w
   type "search" "First"
   clock data
   expect tree has ${JSON.stringify(`entry-${encodeURIComponent(root)}--${encodeURIComponent(file)}`)}
-  expect text "scan-status" == "1 drawing"
+  expect text "scan-status" == "2 drawings"
+  expect text "recent-heading" == "Recent (1)"
   tap ${JSON.stringify(`entry-${encodeURIComponent(root)}`)} contextmenu
   expect tree has "remove-workspace-folder"
   tap "remove-workspace-folder"
