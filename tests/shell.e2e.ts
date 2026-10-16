@@ -24,16 +24,18 @@ await writeFile(testPath, `test "restore the saved folder and open its drawing w
   clock data
   expect tree missing "path"
   expect tree missing "open"
+  expect tree missing ${JSON.stringify(`recent-${encodeURIComponent(root)}`)}
+  expect tree missing ${JSON.stringify(`recent-${encodeURIComponent(otherFolder)}`)}
   expect tree has ${JSON.stringify(`entry-${encodeURIComponent(root)}`)}
   tap ${JSON.stringify(`recent-${encodeURIComponent(file)}`)}
   clock data
-  expect text "active-name" == "First.excalidraw"
+  expect text "active-name" == "First"
   reload
   clock data
   expect tree has ${JSON.stringify(`recent-${encodeURIComponent(file)}`)}
   expect tree has ${JSON.stringify(`entry-${encodeURIComponent(root)}`)}
   clock data
-  expect text "active-name" == "First.excalidraw"
+  expect text "active-name" == "First"
   clock +2000
   clock data
   type "search" "First"
@@ -46,7 +48,7 @@ await writeFile(testPath, `test "restore the saved folder and open its drawing w
   clock data
   expect tree missing ${JSON.stringify(`entry-${encodeURIComponent(root)}`)}
   expect tree has ${JSON.stringify(`entry-${encodeURIComponent(otherFolder)}`)}
-  expect text "active-name" == "First.excalidraw"
+  expect text "active-name" == "First"
 `);
 try {
   for (const host of process.argv.slice(2).length ? process.argv.slice(2) : ['web', 'macos']) {

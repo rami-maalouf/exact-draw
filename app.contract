@@ -31,6 +31,8 @@ shape Reply
 shape PickerSupport
   available: bool
 
+fn drawingName(name: string): string = name.toLowerCase().endsWith(".excalidraw") ? name.slice(0, -11) : name
+
 component ExactDraw
   state query = ""
   state sidebarOpen = true
@@ -40,6 +42,7 @@ component ExactDraw
   resource workspace = loadWorkspace(query) as shape Workspace else empty(activeName="No drawing open")
   mutation changed as shape Reply queue refreshes workspace
   derive actionError = match changed { case some(r) => r.error, case none => "" }
+  derive recentFiles = workspace.recent.filter(item => item.kind == "file")
   task poll mount
     every(1500, refreshWorkspace)
   action toggleSidebar
@@ -73,7 +76,7 @@ component ExactDraw
             row gap=8 align-items="center" padding="2px 4px 4px 6px"
               column flex=1 min-width=0 gap=4
                 text "Drawings" font-size=16 font-weight=600 letter-spacing=-0.3
-                text workspace.activeName min-width=0 text-overflow="ellipsis" font-size=11 color="-exact-secondary-label" testId="active-name"
+                text drawingName(workspace.activeName) min-width=0 text-overflow="ellipsis" font-size=11 color="-exact-secondary-label" testId="active-name"
               button press=toggleSidebar aria-label="Hide sidebar" title="Hide sidebar" aria-expanded=sidebarOpen testId="toggle-sidebar" appearance="none" width=30 height=30 display="flex" align-items="center" justify-content="center" border-radius=6 color="-exact-secondary-label"
                 DrawIcon(name="sidebar", size=18)
             if nativePicker.available
@@ -107,23 +110,23 @@ component ExactDraw
                           column width=10 flex-shrink=0
                         row color=(entry.path == workspace.activePath ? "light-dark(#6455b5, #bfb4f7)" : "-exact-secondary-label")
                           DrawIcon(name=(entry.directory ? "folder" : "file"), size=15)
-                        text entry.name font-size=12 font-weight=(entry.workspaceFolder ? 600 : 400) text-overflow="ellipsis" min-width=0 flex=1
+                        text (entry.directory ? entry.name : drawingName(entry.name)) font-size=12 font-weight=(entry.workspaceFolder ? 600 : 400) text-overflow="ellipsis" min-width=0 flex=1
               text (workspace.scanning ? `Discovering… ${workspace.scanCount} ${workspace.scanCount == 1 ? "drawing" : "drawings"}` : `${workspace.scanCount} ${workspace.scanCount == 1 ? "drawing" : "drawings"}`) font-size=11 color="-exact-secondary-label" padding-left=6 testId="scan-status"
             else
               column flex=1 justify-content="center" gap=8 padding="20px 6px"
                 text "A place for\nyour ideas." font-size=22 font-weight=600 letter-spacing=-0.5
                 text "Open a drawing or add a folder to get started." font-size=13 color="-exact-secondary-label" overflow-wrap="anywhere"
-            if workspace.recent.length > 0
+            if recentFiles.length > 0
               column gap=6 padding-top=10 border-top="1px solid light-dark(#e6e6eb, #323238)"
                 text "Recent" font-size=11 font-weight=600 color="-exact-secondary-label" padding-left=6
                 list appearance="none" virtualized=true height=146 min-height=60 testId="recent"
-                  for item in workspace.recent key=item.path
+                  for item in recentFiles key=item.path
                     row min-height=28
                       button press=openRecent(item.path) hover=hoverEntry(item.path) appearance="none" aria-label=item.path title=item.path testId=`recent-${item.id}` flex=1 min-width=0 padding="6px 7px" border-radius=6 text-align="start" background-color=(hoveredPath == item.path ? "light-dark(#eeeef2, #2c2c32)" : "transparent")
                         row gap=8 align-items="center" min-width=0
                           row color="-exact-secondary-label"
-                            DrawIcon(name=(item.kind == "folder" ? "folder" : "file"), size=14)
-                          text item.name font-size=12 text-overflow="ellipsis" min-width=0 flex=1
+                            DrawIcon(name="file", size=14)
+                          text drawingName(item.name) font-size=12 text-overflow="ellipsis" min-width=0 flex=1
         column id="canvas-host" testId="canvas-host" flex=1 min-width=0 min-height=0 position="relative"
           if workspace.editorUrl != ""
             iframe src=workspace.editorUrl sandbox="allow-scripts allow-same-origin allow-downloads" flex=1 min-height=0 testId="drawing-editor"
