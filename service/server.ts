@@ -4,7 +4,8 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { Documents, FileError, type Snapshot } from './files';
 
-export async function startService(options: { port?: number; stateDirectory?: string; allowedOrigins?: string[]; testLoopbackOrigins?: boolean } = {}) {
+export async function startService(options: { port?: number; stateDirectory?: string; allowedOrigins?: string[]; testLoopbackOrigins?: boolean; workerPath?: string; editorDirectory?: string } = {}) {
+  const editorDirectory = options.editorDirectory ?? resolve(import.meta.dir, '../dist/editor');
   const stateDirectory = options.stateDirectory ?? join(homedir(), 'Library/Application Support/Exact Draw');
   await mkdir(stateDirectory, { recursive: true });
   const documents = new Documents(join(stateDirectory, 'recovery'));
@@ -60,7 +61,7 @@ export async function startService(options: { port?: number; stateDirectory?: st
     const generation = ++scanGeneration;
     files.clear(); scanning = folders.length > 0; scanError = ''; notify();
     if (!scanning) { worker = undefined; return; }
-    worker = new Worker(new URL('./scan-worker.ts', import.meta.url).href);
+    worker = new Worker(options.workerPath ?? new URL('./scan-worker.ts', import.meta.url).href);
     worker.onmessage = event => {
       if (generation !== scanGeneration) return;
       if (event.data.paths) {
@@ -193,11 +194,11 @@ export async function startService(options: { port?: number; stateDirectory?: st
           return new Response(new ReadableStream({ start(controller) { client = controller; subscribers.add(controller); controller.enqueue(encoder.encode(`data: ${revision}\n\n`)); }, cancel() { subscribers.delete(client); } }), { headers: { ...headers, 'content-type': 'text/event-stream' } });
         }
         if (url.pathname === '/editor') {
-          const html = await Bun.file(new URL('../dist/editor/index.html', import.meta.url)).text();
+          const html = await Bun.file(join(editorDirectory, 'index.html')).text();
           return new Response(html, { headers: { ...headers, 'content-type': 'text/html', 'referrer-policy': 'no-referrer' } });
         }
         if (url.pathname.startsWith('/assets/')) {
-          const base = resolve(import.meta.dir, '../dist/editor');
+          const base = editorDirectory;
           const path = resolve(base, decodeURIComponent(url.pathname.slice('/assets/'.length)));
           if (!path.startsWith(base + sep)) return json({ error: 'Invalid asset path.' }, 403);
           const file = Bun.file(path);

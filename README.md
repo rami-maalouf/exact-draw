@@ -37,7 +37,7 @@ Current macOS app, captured October 16, 2026.
 
 ## Current status
 
-Exact Draw is an early local development build. It currently runs through a launcher that starts both the macOS app and its local file service; a standalone Finder-launchable release is still to come.
+Exact Draw is an early local macOS app. A packaged build launches directly from Applications and starts its bundled file service automatically. See [Developing Exact Draw](DEVELOPMENT.md) for building and installing it.
 
 It supports ordinary `.excalidraw` files. Obsidian's `.excalidraw.md` format, Obsidian plugins, live collaboration, and hosted sharing are outside the current implementation. iCloud placeholder handling and coordinated cloud writes have not been qualified, and very large image-heavy drawings need further profiling.
 
