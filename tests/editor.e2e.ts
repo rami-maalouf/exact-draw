@@ -94,7 +94,7 @@ try {
   await expect(page.getByTestId('save-status')).toHaveText('Conflict');
   await expect(page.getByRole('alert')).toContainText('Your edits are safe');
   const recoveries = await readdir(join(root, 'state/recovery'));
-  const recoveryCounts = await Promise.all(recoveries.filter(name => !name.includes('.previous.')).map(async name => JSON.parse(await readFile(join(root, 'state/recovery', name), 'utf8')).elements.length));
+  const recoveryCounts = await Promise.all(recoveries.filter(name => name.endsWith('.excalidraw') && !name.includes('.previous.')).map(async name => JSON.parse(await readFile(join(root, 'state/recovery', name), 'utf8')).elements.length));
   expect(recoveryCounts).toContain(6);
   expect(JSON.parse(await readFile(path, 'utf8')).elements.length).toBe(5);
   await page.getByRole('button', { name: 'Use disk version', exact: true }).click();
@@ -123,6 +123,24 @@ try {
   await expect(page.getByTestId('active-path')).toHaveText(replacement);
   await expect(page.getByTestId('save-status')).toHaveText('Saved');
   console.log('PASS: a moved dirty drawing can be recovered before switching to another file');
+  await page.route('**/api/save', route => route.abort());
+  await draw(0);
+  await expect.poll(async () => page.evaluate(path => JSON.parse(localStorage.getItem(`exact-draw-draft:${path}`) ?? 'null')?.document.elements.length, replacement)).toBe(1);
+  await rename(replacement, `${replacement}.moved`);
+  await service.sync();
+  await expect(page.getByRole('alert')).toContainText('autosave is paused');
+  await page.unroute('**/api/save');
+  const fresh = join(root, 'Fresh.excalidraw');
+  const queued = await fetch(`http://127.0.0.1:${service.server.port}/api/command`, {
+    method: 'POST', headers: { authorization: `Bearer ${service.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ action: 'new', destination: fresh }),
+  });
+  expect(queued.ok).toBe(true);
+  await expect(page.getByTestId('active-path')).toHaveText(fresh);
+  const savedRecoveries = (await readdir(join(root, 'state/recovery'))).filter(name => name.startsWith('Another-') && name.endsWith('.excalidraw'));
+  expect(savedRecoveries.length).toBeGreaterThan(0);
+  expect(JSON.parse(await readFile(join(root, 'state/recovery', savedRecoveries[0]!), 'utf8')).elements).toHaveLength(1);
+  console.log('PASS: native new-file command preserves unsaved content when the previous file has disappeared');
   expect(errors).toEqual([]);
   await page.screenshot({ path: join(screenshots, 'editor-saved.png') });
 } finally { await browser.close(); service.stop(); await rm(root, { recursive: true, force: true }); }

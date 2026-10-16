@@ -11,6 +11,28 @@ final class FileChooser: ExactModule {
     private var serviceReady = false
     private var startupReplies: [ExactReply] = []
     private var startupText = ""
+    private var pendingMenuCommand: String?
+    private lazy var fileMenu = DrawingFileMenu(canChoose: { [weak self] in self?.panel == nil }) { [weak self] action in
+        guard let self else { return }
+        self.pendingMenuCommand = action
+        self.context.changed("file-menu")
+    }
+
+    override func call(_ request: [String: Any]) throws -> [String: Any] {
+        switch request["op"] as? String {
+        case "menu-state":
+            fileMenu.sync(hasDocument: request["hasDocument"] as? Bool == true)
+        case "take-menu-command":
+            let action = pendingMenuCommand ?? ""
+            pendingMenuCommand = nil
+            return ["action": action]
+        case "menu-command-finished":
+            fileMenu.busy = false
+        default:
+            throw ExactNativeRefusal("Unknown native menu request.")
+        }
+        return ["ok": true]
+    }
 
     override func later(_ request: [String: Any], reply: ExactReply) {
         if request["op"] as? String == "start-service" {
@@ -174,11 +196,107 @@ final class FileChooser: ExactModule {
     }
 
     override func destroy() {
+        fileMenu.remove()
+        pendingMenuCommand = nil
         panel?.cancel(nil)
         panel = nil
         serviceOutput?.fileHandleForReading.readabilityHandler = nil
         finishStartup("The app is closing.")
         if service?.isRunning == true { service?.terminate() }
+    }
+}
+
+private final class DrawingFileMenu: NSObject, NSMenuItemValidation {
+    private weak var menu: NSMenu?
+    private var items: [NSMenuItem] = []
+    private var displacedShortcuts: [(NSMenuItem, String, NSEvent.ModifierFlags)] = []
+    private var hasDocument = false
+    var busy = false
+    private let canChoose: () -> Bool
+    private let perform: (String) -> Void
+    private let documentActions: Set<String> = ["save-as", "rename", "duplicate", "move", "history", "close", "trash"]
+
+    init(canChoose: @escaping () -> Bool, perform: @escaping (String) -> Void) {
+        self.canChoose = canChoose
+        self.perform = perform
+        super.init()
+    }
+
+    func sync(hasDocument: Bool) {
+        self.hasDocument = hasDocument
+        guard let target = NSApp.mainMenu?.items.compactMap(\.submenu).first(where: {
+            $0.items.contains { $0.action == #selector(NSWindow.performClose(_:)) }
+        }) else { return }
+        if menu !== target {
+            remove()
+            menu = target
+            let commands: [(String, String)] = [
+                ("new", "New Drawing…"), ("open", "Open Drawing…"),
+                ("save-as", "Save As…"), ("rename", "Rename…"),
+                ("duplicate", "Duplicate"), ("move", "Move…"),
+                ("history", "Version History…"), ("close", "Close Drawing"),
+                ("reopen", "Reopen Closed Drawing"), ("trash", "Move to Trash…"),
+                ("show-trash", "Recently Deleted…"),
+            ]
+            for (action, title) in commands {
+                let item = NSMenuItem(title: title, action: #selector(activate(_:)), keyEquivalent: "")
+                item.target = self
+                item.representedObject = action
+                target.insertItem(item, at: items.count)
+                items.append(item)
+            }
+            let separator = NSMenuItem.separator()
+            target.insertItem(separator, at: items.count)
+            items.append(separator)
+        }
+        let chords: [String: (String, NSEvent.ModifierFlags)] = [
+            "new": ("n", .command), "open": ("o", .command),
+            "save-as": ("s", [.command, .shift]), "close": ("w", .command),
+        ]
+        let mask: NSEvent.ModifierFlags = [.command, .shift, .option, .control]
+        var menus = NSApp.mainMenu.map { [$0] } ?? []
+        while let current = menus.popLast() {
+            for item in current.items {
+                if let submenu = item.submenu { menus.append(submenu) }
+                guard !items.contains(where: { $0 === item }), !item.keyEquivalent.isEmpty,
+                      chords.values.contains(where: { key, modifiers in
+                          key == item.keyEquivalent.lowercased() && modifiers == item.keyEquivalentModifierMask.intersection(mask)
+                      }) else { continue }
+                if !displacedShortcuts.contains(where: { $0.0 === item }) {
+                    displacedShortcuts.append((item, item.keyEquivalent, item.keyEquivalentModifierMask))
+                }
+                item.keyEquivalent = ""
+            }
+        }
+        // appkit caches equivalents; release host chords before assigning ours.
+        for item in items {
+            guard let action = item.representedObject as? String, let (key, modifiers) = chords[action] else { continue }
+            item.keyEquivalent = key
+            item.keyEquivalentModifierMask = modifiers
+        }
+        target.update()
+    }
+
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        guard let action = item.representedObject as? String else { return false }
+        return !busy && canChoose() && (!documentActions.contains(action) || hasDocument)
+    }
+
+    @objc private func activate(_ item: NSMenuItem) {
+        guard validateMenuItem(item), let action = item.representedObject as? String else { return }
+        busy = true
+        perform(action)
+    }
+
+    func remove() {
+        for item in items { item.menu?.removeItem(item) }
+        items.removeAll()
+        for (item, key, modifiers) in displacedShortcuts {
+            item.keyEquivalent = key
+            item.keyEquivalentModifierMask = modifiers
+        }
+        displacedShortcuts.removeAll()
+        menu = nil
     }
 }
 
