@@ -10,7 +10,6 @@ type Snapshot = { path: string; version: string; document: Drawing };
 type Status = 'Opening' | 'Saved' | 'Unsaved' | 'Saving' | 'Offline' | 'Conflict';
 const parameters = new URLSearchParams(location.search);
 const token = parameters.get('token') ?? '';
-const windowControls = parameters.get('windowControls') === '1';
 const stable = (value: unknown): string => JSON.stringify(value, (_key, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b))) : item);
 const contentKey = (document: Drawing) => stable({ elements: document.elements, appState: document.appState, files: document.files });
 class RequestError extends Error { constructor(message: string, public status: number) { super(message); } }
@@ -193,7 +192,7 @@ function Editor() {
     return () => { disposed = true; clearTimeout(timer); clearTimeout(eventTimer); events.close(); window.removeEventListener('focus', wake); document.removeEventListener('visibilitychange', wake); window.removeEventListener('beforeunload', beforeUnload); };
   }, [api]);
 
-  return <main className={`editor-shell${windowControls ? ' native-window' : ''}`}>
+  return <main className="editor-shell">
     <span className="visually-hidden" data-testid="active-path">{path}</span>
     <div className="visually-hidden" role="status" aria-live="polite" data-testid="save-status">{status}</div>
     {notice && <div className={`notice ${conflict ? 'notice-conflict' : ''}`} role="alert"><span>{notice}</span>{conflict ? <button onClick={() => void useDiskRef.current()}>Use disk version</button> : <button onClick={() => void saveRef.current().catch(error => setNotice(error.message))}>Retry</button>}</div>}
