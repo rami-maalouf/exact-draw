@@ -2,18 +2,45 @@ import AppKit
 import UniformTypeIdentifiers
 
 final class FileChooser: ExactModule {
-    private var panel: NSOpenPanel?
+    private var panel: NSSavePanel?
     private let drawingFilter = DrawingFilter()
+    private let destinationFilter = DrawingFilter(rejectExisting: true)
     private var service: Process?
     private var serviceOutput: Pipe?
     private var serviceLog: FileHandle?
     private var serviceReady = false
     private var startupReplies: [ExactReply] = []
     private var startupText = ""
+    private var pendingMenuCommand: String?
+    private lazy var fileMenu = DrawingFileMenu(canChoose: { [weak self] in self?.panel == nil }) { [weak self] action in
+        guard let self else { return }
+        self.pendingMenuCommand = action
+        self.context.changed("file-menu")
+    }
+
+    override func call(_ request: [String: Any]) throws -> [String: Any] {
+        switch request["op"] as? String {
+        case "menu-state":
+            fileMenu.sync(hasDocument: request["hasDocument"] as? Bool == true)
+        case "take-menu-command":
+            let action = pendingMenuCommand ?? ""
+            pendingMenuCommand = nil
+            return ["action": action]
+        case "menu-command-finished":
+            fileMenu.busy = false
+        default:
+            throw ExactNativeRefusal("Unknown native menu request.")
+        }
+        return ["ok": true]
+    }
 
     override func later(_ request: [String: Any], reply: ExactReply) {
         if request["op"] as? String == "start-service" {
             startService(reply)
+            return
+        }
+        if request["op"] as? String == "destination" {
+            chooseDestination(request, reply: reply)
             return
         }
         guard request["op"] as? String == "choose",
@@ -36,6 +63,42 @@ final class FileChooser: ExactModule {
             chooser.allowedContentTypes = [UTType(filenameExtension: "excalidraw") ?? .data]
             chooser.delegate = drawingFilter
         }
+        present(chooser, reply: reply)
+    }
+
+    private func chooseDestination(_ request: [String: Any], reply: ExactReply) {
+        guard let kind = request["kind"] as? String, ["new", "save-as", "move"].contains(kind) else {
+            reply.fail("Unknown drawing destination request.")
+            return
+        }
+        guard panel == nil else { reply.fail("A file chooser is already open."); return }
+        let chooser = NSSavePanel()
+        switch kind {
+        case "new":
+            chooser.title = "New drawing"
+            chooser.prompt = "Create"
+        case "move":
+            chooser.title = "Move drawing"
+            chooser.prompt = "Move"
+        default:
+            chooser.title = "Save drawing as"
+            chooser.prompt = "Save"
+        }
+        chooser.allowedContentTypes = [UTType(filenameExtension: "excalidraw") ?? .data]
+        chooser.allowsOtherFileTypes = false
+        chooser.canCreateDirectories = true
+        chooser.treatsFilePackagesAsDirectories = false
+        chooser.nameFieldStringValue = request["name"] as? String ?? "Untitled.excalidraw"
+        chooser.delegate = destinationFilter
+        if let path = request["path"] as? String, !path.isEmpty {
+            let url = URL(fileURLWithPath: path)
+            let directory = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+            chooser.directoryURL = directory ? url : url.deletingLastPathComponent()
+        }
+        present(chooser, reply: reply)
+    }
+
+    private func present(_ chooser: NSSavePanel, reply: ExactReply) {
         panel = chooser
         let finish: (NSApplication.ModalResponse) -> Void = { [weak self, weak chooser] response in
             self?.panel = nil
@@ -133,6 +196,8 @@ final class FileChooser: ExactModule {
     }
 
     override func destroy() {
+        fileMenu.remove()
+        pendingMenuCommand = nil
         panel?.cancel(nil)
         panel = nil
         serviceOutput?.fileHandleForReading.readabilityHandler = nil
@@ -141,7 +206,108 @@ final class FileChooser: ExactModule {
     }
 }
 
+private final class DrawingFileMenu: NSObject, NSMenuItemValidation {
+    private weak var menu: NSMenu?
+    private var items: [NSMenuItem] = []
+    private var displacedShortcuts: [(NSMenuItem, String, NSEvent.ModifierFlags)] = []
+    private var hasDocument = false
+    var busy = false
+    private let canChoose: () -> Bool
+    private let perform: (String) -> Void
+    private let documentActions: Set<String> = ["save-as", "rename", "duplicate", "move", "history", "close", "trash"]
+
+    init(canChoose: @escaping () -> Bool, perform: @escaping (String) -> Void) {
+        self.canChoose = canChoose
+        self.perform = perform
+        super.init()
+    }
+
+    func sync(hasDocument: Bool) {
+        self.hasDocument = hasDocument
+        guard let target = NSApp.mainMenu?.items.compactMap(\.submenu).first(where: {
+            $0.items.contains { $0.action == #selector(NSWindow.performClose(_:)) }
+        }) else { return }
+        if menu !== target {
+            remove()
+            menu = target
+            let commands: [(String, String)] = [
+                ("new", "New Drawing…"), ("open", "Open Drawing…"),
+                ("save-as", "Save As…"), ("rename", "Rename…"),
+                ("duplicate", "Duplicate"), ("move", "Move…"),
+                ("history", "Version History…"), ("close", "Close Drawing"),
+                ("reopen", "Reopen Closed Drawing"), ("trash", "Move to Trash…"),
+                ("show-trash", "Recently Deleted…"),
+            ]
+            for (action, title) in commands {
+                let item = NSMenuItem(title: title, action: #selector(activate(_:)), keyEquivalent: "")
+                item.target = self
+                item.representedObject = action
+                target.insertItem(item, at: items.count)
+                items.append(item)
+            }
+            let separator = NSMenuItem.separator()
+            target.insertItem(separator, at: items.count)
+            items.append(separator)
+        }
+        let chords: [String: (String, NSEvent.ModifierFlags)] = [
+            "new": ("n", .command), "open": ("o", .command),
+            "save-as": ("s", [.command, .shift]), "close": ("w", .command),
+        ]
+        let mask: NSEvent.ModifierFlags = [.command, .shift, .option, .control]
+        var menus = NSApp.mainMenu.map { [$0] } ?? []
+        while let current = menus.popLast() {
+            for item in current.items {
+                if let submenu = item.submenu { menus.append(submenu) }
+                guard !items.contains(where: { $0 === item }), !item.keyEquivalent.isEmpty,
+                      chords.values.contains(where: { key, modifiers in
+                          key == item.keyEquivalent.lowercased() && modifiers == item.keyEquivalentModifierMask.intersection(mask)
+                      }) else { continue }
+                if !displacedShortcuts.contains(where: { $0.0 === item }) {
+                    displacedShortcuts.append((item, item.keyEquivalent, item.keyEquivalentModifierMask))
+                }
+                item.keyEquivalent = ""
+            }
+        }
+        // appkit caches equivalents; release host chords before assigning ours.
+        for item in items {
+            guard let action = item.representedObject as? String, let (key, modifiers) = chords[action] else { continue }
+            item.keyEquivalent = key
+            item.keyEquivalentModifierMask = modifiers
+        }
+        target.update()
+    }
+
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        guard let action = item.representedObject as? String else { return false }
+        return !busy && canChoose() && (!documentActions.contains(action) || hasDocument)
+    }
+
+    @objc private func activate(_ item: NSMenuItem) {
+        guard validateMenuItem(item), let action = item.representedObject as? String else { return }
+        busy = true
+        perform(action)
+    }
+
+    func remove() {
+        for item in items { item.menu?.removeItem(item) }
+        items.removeAll()
+        for (item, key, modifiers) in displacedShortcuts {
+            item.keyEquivalent = key
+            item.keyEquivalentModifierMask = modifiers
+        }
+        displacedShortcuts.removeAll()
+        menu = nil
+    }
+}
+
 private final class DrawingFilter: NSObject, NSOpenSavePanelDelegate {
+    private let rejectExisting: Bool
+
+    init(rejectExisting: Bool = false) {
+        self.rejectExisting = rejectExisting
+        super.init()
+    }
+
     func panel(_ sender: Any, shouldEnable url: URL) -> Bool {
         let directory = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
         return directory || url.pathExtension == "excalidraw"
@@ -150,6 +316,9 @@ private final class DrawingFilter: NSObject, NSOpenSavePanelDelegate {
     func panel(_ sender: Any, validate url: URL) throws {
         guard url.pathExtension == "excalidraw" else {
             throw NSError(domain: "ExactDraw", code: 1, userInfo: [NSLocalizedDescriptionKey: "Choose a .excalidraw drawing."])
+        }
+        if rejectExisting && FileManager.default.fileExists(atPath: url.path) {
+            throw NSError(domain: "ExactDraw", code: 2, userInfo: [NSLocalizedDescriptionKey: "A drawing already exists at this location. Choose a new name or another folder."])
         }
     }
 }

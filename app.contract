@@ -41,9 +41,11 @@ component ExactDraw
   state menuFolder = ""
   state hoveredPath = ""
   resource nativePicker = pickerAvailable() as shape PickerSupport else empty()
+  resource nativeMenu = handleNativeMenu() as shape Reply else empty()
   resource workspace = loadWorkspace(query) as shape Workspace else empty(activeName="No drawing open")
   mutation changed as shape Reply queue refreshes workspace
-  derive actionError = match changed { case some(r) => r.error, case none => "" }
+  derive changedError = match changed { case some(r) => r.error, case none => "" }
+  derive actionError = changedError != "" ? changedError : nativeMenu.error
   derive recentFiles = workspace.recent.filter(item => item.kind == "file")
   task poll mount
     every(1500, refreshWorkspace)
@@ -61,6 +63,8 @@ component ExactDraw
     send changed = chooseLocation(kind)
   action openRecent(value: string)
     send changed = openLocation(value)
+  action command(value: string)
+    send changed = drawingCommand(value)
   action activate(value: string, directory: bool)
     if directory
       send changed = toggleFolder(value)
@@ -80,6 +84,8 @@ component ExactDraw
         if sidebarOpen
           column testId="sidebar" width=288 flex-shrink=0 padding="44px 12px 12px" gap=10 background-color=boardBackground border-right="1px solid light-dark(#e6e6eb, #323238)" font-size=13
             if nativePicker.available
+              button press=command("new") disabled=pending(changed) testId="new-drawing" aria-label="New drawing" text-align="start"
+                text "New drawing"
               row gap=6
                 button press=browse("file") disabled=pending(changed) appearance="none" testId="open-drawing" aria-label="Open drawing" flex=1 padding="8px 10px" border-radius=7 background-color="light-dark(#ffffff, #2b2b30)" border="1px solid light-dark(#dedee5, #3b3b43)" text-align="start"
                   row gap=7 align-items="center"
@@ -115,7 +121,7 @@ component ExactDraw
             else
               column flex=1 justify-content="center" gap=8 padding="20px 6px"
                 text "A place for\nyour ideas." font-size=22 font-weight=600 letter-spacing=-0.5
-                text "Open a drawing or add a folder to get started." font-size=13 color="-exact-secondary-label" overflow-wrap="anywhere"
+                text "Create a drawing, open one, or add a folder to get started." font-size=13 color="-exact-secondary-label" overflow-wrap="anywhere"
             if recentFiles.length > 0
               column gap=6 padding-top=10 border-top="1px solid light-dark(#e6e6eb, #323238)"
                 text `Recent (${recentFiles.length})` font-size=11 font-weight=600 color="-exact-secondary-label" padding-left=6 testId="recent-heading"
@@ -144,6 +150,33 @@ component ExactDraw
           text drawingName(workspace.activeName) min-width=0 max-width=280 white-space="nowrap" overflow="hidden" text-overflow="ellipsis" font-size=12 color="-exact-secondary-label" testId="active-name" title=workspace.activeName
         button press=toggleSidebar aria-label=(sidebarOpen ? "Hide sidebar" : "Show sidebar") aria-keyshortcuts="Meta+b" -exact-menu="view" title=(sidebarOpen ? "Hide sidebar (⌘B)" : "Show sidebar (⌘B)") aria-expanded=sidebarOpen testId="toggle-sidebar" appearance="none" width=26 height=26 flex-shrink=0 display="flex" align-items="center" justify-content="center" border-radius=6 color="-exact-secondary-label"
           DrawIcon(name="sidebar", size=18)
+        button popovertarget="drawing-menu" aria-label="Drawing actions" aria-haspopup="menu" testId="drawing-actions" appearance="none" height=26 flex-shrink=0 padding="0px 7px" border-radius=6 font-size=12 color="-exact-secondary-label"
+          text "Drawing"
+      if not sidebarOpen and (actionError != "" or workspace.error != "")
+        text (actionError != "" ? actionError : workspace.error) position="absolute" top=36 left=12 max-width=420 padding=10 border-radius=7 background-color="-exact-secondary-background" color="-exact-system-red" font="-exact-footnote" testId="header-action-error" overflow-wrap="anywhere"
+      column id="drawing-menu" popover="auto" role="menu" aria-label="Drawing actions" position="absolute"
+        button press=command("new") disabled=(pending(changed) or not nativePicker.available) popovertarget="drawing-menu" popovertargetaction="hide" role="menuitem" testId="drawing-new"
+          text "New drawing…"
+        button press=browse("file") disabled=(pending(changed) or not nativePicker.available) popovertarget="drawing-menu" popovertargetaction="hide" role="menuitem" testId="drawing-open"
+          text "Open drawing…"
+        button press=command("save-as") disabled=(pending(changed) or not nativePicker.available or workspace.activePath == "") popovertarget="drawing-menu" popovertargetaction="hide" role="menuitem" testId="drawing-save-as"
+          text "Save as…"
+        button press=command("rename") disabled=(pending(changed) or workspace.activePath == "") popovertarget="drawing-menu" popovertargetaction="hide" role="menuitem" testId="drawing-rename"
+          text "Rename…"
+        button press=command("duplicate") disabled=(pending(changed) or workspace.activePath == "") popovertarget="drawing-menu" popovertargetaction="hide" role="menuitem" testId="drawing-duplicate"
+          text "Duplicate"
+        button press=command("move") disabled=(pending(changed) or not nativePicker.available or workspace.activePath == "") popovertarget="drawing-menu" popovertargetaction="hide" role="menuitem" testId="drawing-move"
+          text "Move…"
+        button press=command("history") disabled=(pending(changed) or workspace.activePath == "") popovertarget="drawing-menu" popovertargetaction="hide" role="menuitem" testId="drawing-history"
+          text "Version history…"
+        button press=command("close") disabled=(pending(changed) or workspace.activePath == "") popovertarget="drawing-menu" popovertargetaction="hide" role="menuitem" testId="drawing-close"
+          text "Close drawing"
+        button press=command("reopen") disabled=pending(changed) popovertarget="drawing-menu" popovertargetaction="hide" role="menuitem" testId="drawing-reopen"
+          text "Reopen closed drawing"
+        button press=command("trash") disabled=(pending(changed) or workspace.activePath == "") popovertarget="drawing-menu" popovertargetaction="hide" role="menuitem" testId="drawing-trash"
+          text "Move to Trash…"
+        button press=command("show-trash") disabled=pending(changed) popovertarget="drawing-menu" popovertargetaction="hide" role="menuitem" testId="drawing-trash-list"
+          text "Recently deleted…"
       column id="folder-menu" popover="auto" role="menu" aria-label="Folder actions" position="absolute"
         button press=removeFolder(menuFolder) popovertarget="folder-menu" popovertargetaction="hide" testId="remove-workspace-folder"
           text "Remove from workspace"

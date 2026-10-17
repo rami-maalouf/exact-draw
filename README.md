@@ -15,6 +15,9 @@ The project also explores what it takes to build a practical desktop app with [E
 ## What you can do
 
 - **Work with your own files.** Choose a drawing or add a folder through the macOS file picker. Multiple folders stay in your workspace across restarts.
+- **Manage the whole drawing lifecycle.** The Drawing menu creates files, saves independent copies, renames, duplicates, moves, closes, and reopens drawings. Native destination panels keep the files in folders you choose.
+- **Recover earlier work.** Version history previews saved versions without changing the canvas. Restore creates a new revision, and manual checkpoints mark a version explicitly. Each drawing retains its latest 50 versions across restarts and app-initiated moves.
+- **Restore deleted drawings.** Move a drawing to Exact Draw’s Trash and restore it with its history from **Drawing > Recently deleted**. Existing destination files are never replaced.
 - **Browse only drawings.** The explorer shows `.excalidraw` files and their folder hierarchy. Discovery runs in the background, skips dependency/build directories and symlinks, and does not read unrelated file contents.
 - **Find and return to work.** Search drawing paths, expand folders, and reopen files from Recents. Drawing labels omit the extension to keep the list readable.
 - **See external edits.** The active drawing updates when another tool changes its file. Folder discovery leaves the current canvas open.

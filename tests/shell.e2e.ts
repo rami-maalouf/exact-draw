@@ -1,23 +1,21 @@
-import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { startService } from '../service/server';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { createShellFixture } from './shell-fixture';
 
-const root = await realpath(await mkdtemp(join(tmpdir(), 'draw-shell-')));
-const app = resolve(import.meta.dir, '..');
+const fixture = await createShellFixture();
+const root = join(fixture.dataDirectory, 'drawings');
+const app = fixture.app;
+await mkdir(root);
 const file = join(root, 'First.excalidraw');
 const otherFolder = join(root, 'Other');
 await mkdir(otherFolder);
 await writeFile(file, JSON.stringify({ type: 'excalidraw', version: 2, elements: [], appState: {}, files: {} }));
 await writeFile(join(root, 'Unopened.excalidraw'), JSON.stringify({ type: 'excalidraw', version: 2, elements: [], appState: {}, files: {} }));
 await writeFile(join(root, 'hidden.excalidraw.md'), 'not a supported drawing');
-const options = { port: 47931, stateDirectory: join(root, 'state'), testLoopbackOrigins: true };
-let service = await startService(options);
-await service.open(file);
-await service.open(root);
-await service.open(otherFolder);
-service.stop();
-service = await startService(options);
+await fixture.service.open(file);
+await fixture.service.open(root);
+await fixture.service.open(otherFolder);
+await fixture.restart();
 const testPath = join(app, '.exact/shell.test.contract');
 await mkdir(join(app, '.exact'), { recursive: true });
 await writeFile(testPath, `test "restore the saved folder and open its drawing without a path field"
@@ -52,12 +50,24 @@ await writeFile(testPath, `test "restore the saved folder and open its drawing w
   expect tree missing ${JSON.stringify(`entry-${encodeURIComponent(root)}`)}
   expect tree has ${JSON.stringify(`entry-${encodeURIComponent(otherFolder)}`)}
   expect text "active-name" == "First"
+  type "toggle-sidebar" key "Meta+b"
+  clock settle
+  expect tree missing "sidebar"
+  expect tree has "drawing-actions"
+  tap "drawing-actions"
+  clock settle
+  expect tree has "drawing-history"
+  expect tree has "drawing-reopen"
+  expect tree has "drawing-trash-list"
+  tap "drawing-actions"
+  clock settle
+  type "toggle-sidebar" key "Meta+b"
+  clock settle
 `);
 try {
   for (const host of process.argv.slice(2).length ? process.argv.slice(2) : ['web', 'macos']) {
-    await service.open(root);
-    const child = Bun.spawn([process.execPath, 'exact.mjs', 'test', host, testPath], { cwd: app, stdout: 'inherit', stderr: 'inherit', env: { ...Bun.env, CHROME: Bun.env.CHROME ?? '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser' } });
-    const code = await child.exited;
-    if (code) throw new Error(`${host} shell test failed (${code})`);
+    await fixture.service.open(root);
+    if (host === 'macos') await fixture.buildNative();
+    await fixture.run(['exact.mjs', 'test', host, testPath]);
   }
-} finally { service.stop(); await rm(root, { recursive: true, force: true }); }
+} finally { await fixture.dispose(Bun.env.EXACT_KEEP_SHELL_FIXTURE === '1'); }

@@ -1,4 +1,4 @@
-import type { Answer, Result, Sources } from './app.contract.d.ts';
+import type { Answer, Result, Sources, NativeModule } from './app.contract.d.ts';
 export const appId = 'com.example.exact-draw-ba51d7';
 const API = 'http://127.0.0.1:47931';
 export const grants = `net.fetch ${API}`;
@@ -32,6 +32,22 @@ async function action(route: string, body: unknown) {
   try { await call(route, body); revision = -1; return { ok: true, error: '' }; }
   catch (error) { if ((error as { code?: string }).code === 'bake') throw error; return { ok: false, error: (error as Error).message }; }
 }
+async function drawingCommand(command: string, native?: NativeModule | null) {
+  try {
+    if (command === 'new' || command === 'save-as' || command === 'move') {
+      if (!native?.available) return { ok: false, error: 'Choose drawing destinations using the macOS app.' };
+      const name = command === 'new' ? 'Untitled.excalidraw' : command === 'save-as' ? `${last.activeName.replace(/\.excalidraw$/i, '')} copy.excalidraw` : last.activeName;
+      const selected = await native.later({ op: 'destination', kind: command, path: last.activePath || last.root, name });
+      if (selected.cancelled === true) return { ok: true, error: '' };
+      if (typeof selected.path !== 'string' || !selected.path) throw new Error('The chooser did not return a path.');
+      return await action('/api/command', { action: command, destination: selected.path });
+    }
+    return await action('/api/command', { action: command });
+  } catch (error) {
+    if ((error as { code?: string }).code === 'bake') throw error;
+    return { ok: false, error: (error as Error).message };
+  }
+}
 const sources: Sources = {
   pickerAvailable: (_args, _store, _storage, native) => ({ available: native?.available === true }),
   chooseLocation: async ([kind], _store, _storage, native) => {
@@ -40,7 +56,7 @@ const sources: Sources = {
       const selected = await native.later({ op: 'choose', kind });
       if (selected.cancelled === true) return { ok: true, error: '' };
       if (typeof selected.path !== 'string' || !selected.path) throw new Error('The chooser did not return a path.');
-      return await action('/api/open', { path: selected.path });
+      return await action(kind === 'folder' ? '/api/open' : '/api/command', kind === 'folder' ? { path: selected.path } : { action: 'open', destination: selected.path });
     } catch (error) {
       if ((error as { code?: string }).code === 'bake') throw error;
       return { ok: false, error: (error as Error).message };
@@ -54,6 +70,7 @@ const sources: Sources = {
         revision = result.revision; lastQuery = query;
         last = { root: result.root, activePath: result.activePath, activeName: result.activeName, scanning: result.scanning, scanCount: result.scanCount, error: result.error, entries: result.entries, recent: result.recent, editorUrl: `${session!.editorUrl}&titlebar=overlay` };
       }
+      if (native?.available) native.call({ op: 'menu-state', hasDocument: last.activePath !== '' });
       return last;
     } catch (error) {
       if ((error as { code?: string }).code === 'bake') throw error;
@@ -61,7 +78,19 @@ const sources: Sources = {
       return { ...last, error: native?.available ? `Could not connect to the file service: ${(error as Error).message}` : 'Start the local file service with bun run start, then try again.' };
     }
   },
-  openLocation: ([path]) => action('/api/open', { path }),
+  handleNativeMenu: async (_args, store, storage, native) => {
+    if (!native?.available) return { ok: true, error: '' };
+    native.watch('file-menu');
+    const selected = native.call({ op: 'take-menu-command' });
+    if (typeof selected.action !== 'string' || !selected.action) return { ok: true, error: '' };
+    try {
+      return selected.action === 'open'
+        ? await sources.chooseLocation(['file'], store, storage, native)
+        : await drawingCommand(selected.action, native);
+    } finally { native.call({ op: 'menu-command-finished' }); }
+  },
+  openLocation: ([path]) => action('/api/command', { action: 'open', destination: path }),
+  drawingCommand: ([command], _store, _storage, native) => drawingCommand(command, native),
   toggleFolder: ([path]) => action('/api/toggle', { path }),
   rescanFolder: () => action('/api/rescan', {}),
   removeWorkspaceFolder: ([path]) => action('/api/remove-folder', { path }),
