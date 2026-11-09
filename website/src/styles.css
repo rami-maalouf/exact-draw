@@ -307,7 +307,7 @@ h1 .ext {
 .scribble {
   position: absolute;
   top: 18%;
-  left: -9.5rem;
+  left: -11.5rem;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -323,7 +323,7 @@ h1 .ext {
 .scribble svg {
   width: 6.5rem;
   height: auto;
-  margin: 0.3rem -0.5rem 0 0;
+  margin: 0.3rem -2.5rem 0 0;
   fill: none;
   stroke: var(--lilac);
   stroke-width: 2.4;
@@ -674,7 +674,7 @@ h2 {
   }
 }
 
-@media (max-width: 1240px) {
+@media (max-width: 1300px) {
   .scribble {
     display: none;
   }

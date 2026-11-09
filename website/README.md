@@ -12,7 +12,7 @@ Vercel function for the waitlist.
 | `src/styles.css` | The look: near-black with a violet cast, the brand's pencil violet, Virgil for the one hand-drawn note. |
 | `src/main.js` | Entrances, the window tilt, the word-by-word statement, and the waitlist (`/?join` opens it). |
 | `api/waitlist.ts` | Saves the email to the shared Notion waitlist (`App: exact-draw`, `Platform: macOS`). Needs `NOTION_API_KEY` and `NOTION_WAITLIST_DATASOURCE_ID` on the Vercel project. |
-| `src/img/` | `app.jpg` (from `docs/screenshots/sidebar-open.jpg`, 1800 px wide), the mark, icons, and `share.jpg` (a 1200x630 capture of the hero). |
+| `src/img/` | `app.jpg` (a capture of the installed app with the road-board drawing, 1800 px wide), the mark, icons, and `share.jpg` (a 1200x630 capture of the hero). |
 | `src/public/fonts/` | Sora, Geist, Geist Mono, and Virgil from `@excalidraw/excalidraw` (all SIL OFL). |
 
 ```sh
