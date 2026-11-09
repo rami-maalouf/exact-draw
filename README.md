@@ -10,7 +10,7 @@ A drawing often lives alongside the work it explains: source code, notes, a vide
 
 It is built for a workflow where you and an external tool, including an AI coding agent, take turns editing a drawing. When the file changes on disk, the editor refreshes while preserving your view. When you draw, your changes autosave to the same file. Version checks and recovery copies help protect against saving over an external change you have not loaded.
 
-The project also explores what it takes to build a practical desktop app with [Exact](https://github.com/ccheever/exact2). Exact provides the native shell and file explorer; the official Excalidraw editor runs in an embedded WebKit view. Framework gaps, integration decisions, and verification evidence are recorded in the [Exact experience journal](docs/exact-experience.md).
+The project also explores what it takes to build a practical desktop app with [Exact](https://github.com/expo/exact). Exact provides the native shell and file explorer; the official Excalidraw editor runs in an embedded WebKit view. Framework gaps, integration decisions, and verification evidence are recorded in the [Exact experience journal](docs/exact-experience.md).
 
 ## What you can do
 

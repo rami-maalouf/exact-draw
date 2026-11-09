@@ -1,5 +1,5 @@
 {
-  "$schema": "../exact2/scripts/app.schema.json",
+  "$schema": "../expo-exact/scripts/app.schema.json",
   "name": "Exact Draw",
   "short_name": "Exact Draw",
   "id": "com.example.exact-draw-ba51d7",

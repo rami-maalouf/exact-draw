@@ -4,3 +4,4 @@
 /app.contract.d.ts
 /.exact/
 /native-server/
+/.env.local

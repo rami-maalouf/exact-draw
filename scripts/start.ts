@@ -19,7 +19,7 @@ try {
   else {
     await run(['exact.mjs', 'mac', '--bundle']);
     process.env.EXACT_APP_DIR = root;
-    const sdk = resolve(root, process.env.EXACT2 ?? '../exact2');
+    const sdk = resolve(root, process.env.EXACT2 ?? '../expo-exact');
     const { resolveApp } = await import(resolve(sdk, 'scripts/app.mjs'));
     const { appleArtifacts } = await import(resolve(sdk, 'host/apple/build.mjs'));
     const artifact = appleArtifacts(resolveApp());

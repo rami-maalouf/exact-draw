@@ -220,3 +220,11 @@ Independent review caught app-level coordination issues: scan warnings sharing t
 Synthetic local discovery benchmark: 5,000 drawings, 5,000 ignored dependency files, one unrelated 4 GiB sparse file; discovery 27 ms, 30 concurrent active-document requests, p95 0.19 ms and max 0.88 ms. The active drawing was preserved. This measures service responsiveness with warm local data, not native frame timing, cloud enumeration or downloading 4 GiB.
 
 Still unqualified: iCloud placeholders/coordinated writes, sandbox bookmarks, very large image drawings, notarized public distribution. Finder launch with the bundled service is now verified locally. Browser-level gestures do not by themselves prove macOS WebKit input behavior.
+
+## 019: migration to expo/exact (2026-11-09)
+
+Status: Contract compilation, TypeScript/service checks, and the real-filesystem shell workflow passed on web and macOS at upstream `94b8671f70fe2e25b307a40e7fce66dc27c9f802`.
+
+Used the upstream `exact new <app> --update` command to regenerate the launcher, schema path, Cargo dependencies and agent instructions against the sibling `../expo-exact` checkout; `exact lock` refreshed the lockfile. The development launcher and benchmark setup must resolve the same checkout too. Historical baselines above remain historical.
+
+Browser qualification required `CHROME` pointing to the installed Brave executable because the default Playwright headless-shell cache entry was missing. The compiler also reports the existing fixed sidebar width as an accessibility warning; no new layout behavior was authored in this migration. Installed app replacement and native guest visual inspection were not performed.

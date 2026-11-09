@@ -13,16 +13,16 @@ Install these before starting:
 - **Bun 1.4.2**, the version used for the verified development workflow. Use Bun for dependency installation and scripts.
 - **A Chromium browser** for browser tests. This app's E2E scripts default to Brave; set `CHROME` to another Chromium executable if needed.
 
-Exact is young and changes frequently. The last recorded framework baseline for this app is `b0e24ded45`; compatibility with newer revisions must be checked. Consult the adjacent Exact checkout's README for its current platform prerequisites.
+Exact is young and changes frequently. The framework checkout is [expo/exact](https://github.com/expo/exact), migrated at `94b8671f70fe2e25b307a40e7fce66dc27c9f802`. Consult the adjacent Exact checkout's README for its current platform prerequisites.
 
 ## First run
 
 Clone the app and framework beside each other. Skip either clone if that checkout already exists:
 
 ```sh
-git clone https://github.com/ccheever/exact2.git
+git clone https://github.com/expo/exact.git expo-exact
 git clone https://github.com/rami-maalouf/exact-draw.git
-cd exact2
+cd expo-exact
 bun scripts/exact.mjs setup
 bun scripts/exact.mjs setup --check
 cd ../exact-draw
@@ -34,7 +34,7 @@ The expected layout is:
 
 ```text
 parent/
-  exact2/
+  expo-exact/
   exact-draw/
 ```
 
@@ -71,7 +71,7 @@ bun run start:web
 
 Open `http://127.0.0.1:8765`. The browser preview can browse saved workspace folders and recent drawings. Selecting new filesystem locations uses the macOS picker and remains a native-app operation. Both launchers use the same service port and saved workspace, so run one at a time.
 
-The app resolves Exact from `../exact2`; `EXACT2` can override that path. Prefer the adjacent layout when getting started.
+The app resolves Exact from `../expo-exact`; `EXACT2` can override that path. Prefer the adjacent layout when getting started.
 
 ## Project structure
 
