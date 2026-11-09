@@ -26,7 +26,8 @@ const windowEl = document.querySelector("[data-tilt]");
 const lit = document.querySelector("[data-lit]");
 const spans = [];
 if (lit) {
-  const words = lit.textContent.trim().split(/\s+/);
+  // split on plain spaces only, so non-breaking spaces keep word pairs together
+  const words = lit.textContent.trim().split(/[ \t\n]+/);
   lit.textContent = "";
   words.forEach((word, i) => {
     const span = document.createElement("span");
